@@ -135,8 +135,32 @@ class SettingsDialog(QtWidgets.QDialog):
         self.prog_style_combo.currentIndexChanged.connect(self.apply_settings)
         self.text_check.toggled.connect(self.apply_settings)
         
+        self.color_normal_val = self.app.color_normal
+        self.color_warning_val = self.app.color_warning
+        self.color_critical_val = self.app.color_critical
+        self.color_charging_val = self.app.color_charging
+
+        self.btn_color_normal = QtWidgets.QPushButton(self.color_normal_val)
+        self.btn_color_warning = QtWidgets.QPushButton(self.color_warning_val)
+        self.btn_color_critical = QtWidgets.QPushButton(self.color_critical_val)
+        self.btn_color_charging = QtWidgets.QPushButton(self.color_charging_val)
+
+        self.update_btn_style(self.btn_color_normal, self.color_normal_val)
+        self.update_btn_style(self.btn_color_warning, self.color_warning_val)
+        self.update_btn_style(self.btn_color_critical, self.color_critical_val)
+        self.update_btn_style(self.btn_color_charging, self.color_charging_val)
+
+        self.btn_color_normal.clicked.connect(lambda: self.pick_color("color_normal_val", self.btn_color_normal))
+        self.btn_color_warning.clicked.connect(lambda: self.pick_color("color_warning_val", self.btn_color_warning))
+        self.btn_color_critical.clicked.connect(lambda: self.pick_color("color_critical_val", self.btn_color_critical))
+        self.btn_color_charging.clicked.connect(lambda: self.pick_color("color_charging_val", self.btn_color_charging))
+
         form.addRow("Warning (Orange) Threshold:", self.warning_spin)
         form.addRow("Critical (Red) Threshold:", self.critical_spin)
+        form.addRow("Normal Level Color:", self.btn_color_normal)
+        form.addRow("Warning Level Color:", self.btn_color_warning)
+        form.addRow("Critical Level Color:", self.btn_color_critical)
+        form.addRow("Charging State Color:", self.btn_color_charging)
         form.addRow("Icon Direction Style:", self.layout_combo)
         form.addRow("Icon Source Set:", self.source_combo)
         form.addRow("Programmatic Draw Style:", self.prog_style_combo)
@@ -167,6 +191,23 @@ class SettingsDialog(QtWidgets.QDialog):
         self.theme_combo.setEnabled(is_svg)
         self.prog_style_combo.setEnabled(not is_svg)
 
+    def update_btn_style(self, btn, color_hex):
+        btn.setText(color_hex.upper())
+        qcol = QtGui.QColor(color_hex)
+        lum = (0.299 * qcol.red() + 0.587 * qcol.green() + 0.114 * qcol.blue()) / 255.0
+        text_col = "#000000" if lum > 0.5 else "#FFFFFF"
+        btn.setStyleSheet(f"QPushButton {{ background-color: {color_hex}; color: {text_col}; border: 1px solid #555; border-radius: 4px; padding: 4px; font-weight: bold; }}")
+
+    def pick_color(self, attr_name, btn_target):
+        current_hex = getattr(self, attr_name)
+        init_color = QtGui.QColor(current_hex)
+        color = QtWidgets.QColorDialog.getColor(init_color, self, "Select Status Color")
+        if color.isValid():
+            new_hex = color.name().upper()
+            setattr(self, attr_name, new_hex)
+            self.update_btn_style(btn_target, new_hex)
+            self.apply_settings()
+
     def validate_thresholds(self):
         warn_val = self.warning_spin.value()
         crit_val = self.critical_spin.value()
@@ -196,6 +237,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.show_text = show_txt
         self.app.poll_interval = interval_val
         self.app.autostart_enabled = autostart
+        self.app.color_normal = self.color_normal_val
+        self.app.color_warning = self.color_warning_val
+        self.app.color_critical = self.color_critical_val
+        self.app.color_charging = self.color_charging_val
         
         self.app.settings.setValue("warning_threshold", warn_val)
         self.app.settings.setValue("critical_threshold", crit_val)
@@ -206,6 +251,10 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.settings.setValue("show_text", show_txt)
         self.app.settings.setValue("poll_interval", interval_val)
         self.app.settings.setValue("autostart", autostart)
+        self.app.settings.setValue("color_normal", self.color_normal_val)
+        self.app.settings.setValue("color_warning", self.color_warning_val)
+        self.app.settings.setValue("color_critical", self.color_critical_val)
+        self.app.settings.setValue("color_charging", self.color_charging_val)
         
         self.app.toggle_autostart(autostart)
         self.app.poll_timer.setInterval(interval_val * 1000)
@@ -256,6 +305,12 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.autostart_enabled = self.settings.value("autostart", False, type=bool)
         self.warning_threshold = self.settings.value("warning_threshold", 20, type=int)
         self.critical_threshold = self.settings.value("critical_threshold", 14, type=int)
+        
+        # Status colors configuration
+        self.color_normal = self.settings.value("color_normal", "#E0E0E0", type=str)
+        self.color_warning = self.settings.value("color_warning", "#F39C12", type=str)
+        self.color_critical = self.settings.value("color_critical", "#FF6B6B", type=str)
+        self.color_charging = self.settings.value("color_charging", "#2ECC71", type=str)
         
         # Load charged timestamp (float or None)
         self.last_charged_time = self.settings.value("last_charged_time", 0.0, type=float)
@@ -576,17 +631,17 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             # Gray when offline and we have no historical data yet
             color_hex = "#7F8C8D"
         elif self.is_charging:
-            # Green when charging
-            color_hex = "#2ECC71"
+            # Custom charging color
+            color_hex = self.color_charging
         elif self.battery_percentage <= self.critical_threshold:
-            # Light Red when critical
-            color_hex = "#FF6B6B"
+            # Custom critical color
+            color_hex = self.color_critical
         elif self.battery_percentage <= self.warning_threshold:
-            # Orange when warning
-            color_hex = "#F39C12"
+            # Custom warning color
+            color_hex = self.color_warning
         else:
-            # Default white/light grey for standard discharging battery levels
-            color_hex = "#E0E0E0"
+            # Custom normal color for standard discharging battery levels
+            color_hex = self.color_normal
             
         icon = self.draw_battery_icon(
             percentage=self.battery_percentage,
