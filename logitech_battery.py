@@ -155,8 +155,16 @@ class SettingsDialog(QtWidgets.QDialog):
         self.btn_color_critical.clicked.connect(lambda: self.pick_color("color_critical_val", self.btn_color_critical))
         self.btn_color_charging.clicked.connect(lambda: self.pick_color("color_charging_val", self.btn_color_charging))
 
+        self.icon_size_spin = QtWidgets.QSpinBox()
+        self.icon_size_spin.setRange(16, 64)
+        self.icon_size_spin.setValue(self.app.icon_size)
+        self.icon_size_spin.setSuffix(" px")
+        self.icon_size_spin.setSingleStep(2)
+        self.icon_size_spin.valueChanged.connect(self.apply_settings)
+
         form.addRow("Warning (Orange) Threshold:", self.warning_spin)
         form.addRow("Critical (Red) Threshold:", self.critical_spin)
+        form.addRow("Tray Icon Size:", self.icon_size_spin)
         form.addRow("Normal Level Color:", self.btn_color_normal)
         form.addRow("Warning Level Color:", self.btn_color_warning)
         form.addRow("Critical Level Color:", self.btn_color_critical)
@@ -221,6 +229,7 @@ class SettingsDialog(QtWidgets.QDialog):
         icon_sty = self.source_combo.currentIndex()
         theme_idx = self.theme_combo.currentIndex()
         prog_sty = self.prog_style_combo.currentIndex()
+        icon_sz = self.icon_size_spin.value()
         
         interval_vals = [5, 10, 30, 60]
         interval_val = interval_vals[self.interval_combo.currentIndex()]
@@ -233,6 +242,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.icon_style = icon_sty
         self.app.colored_theme = theme_idx
         self.app.programmatic_style = prog_sty
+        self.app.icon_size = icon_sz
         self.app.horizontal_layout = horiz_layout
         self.app.show_text = show_txt
         self.app.poll_interval = interval_val
@@ -247,6 +257,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.settings.setValue("icon_style", icon_sty)
         self.app.settings.setValue("colored_theme", theme_idx)
         self.app.settings.setValue("programmatic_style", prog_sty)
+        self.app.settings.setValue("icon_size", icon_sz)
         self.app.settings.setValue("horizontal_layout", horiz_layout)
         self.app.settings.setValue("show_text", show_txt)
         self.app.settings.setValue("poll_interval", interval_val)
@@ -305,6 +316,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.autostart_enabled = self.settings.value("autostart", False, type=bool)
         self.warning_threshold = self.settings.value("warning_threshold", 20, type=int)
         self.critical_threshold = self.settings.value("critical_threshold", 14, type=int)
+        self.icon_size = self.settings.value("icon_size", 32, type=int)
         
         # Status colors configuration
         self.color_normal = self.settings.value("color_normal", "#E0E0E0", type=str)
@@ -655,7 +667,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
 
         
     def draw_battery_icon(self, percentage, is_charging, is_horizontal, show_text, battery_color_hex):
-        size = 32
+        size = getattr(self, "icon_size", 32)
+        scale = size / 32.0
         pixmap = QtGui.QPixmap(size, size)
         pixmap.fill(QtGui.QColor(0, 0, 0, 0)) # transparent background
         
@@ -664,8 +677,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         
         # Style 5 is Circular Ring Gauge
         if self.programmatic_style == 5:
-            rect = QtCore.QRectF(3, 3, 26, 26)
-            stroke_w = 5.0
+            rect = QtCore.QRectF(3 * scale, 3 * scale, 26 * scale, 26 * scale)
+            stroke_w = 5.0 * scale
             
             # Background track ring (semi-transparent for high contrast on dark & light panels)
             track_color = QtGui.QColor(255, 255, 255, 60)
@@ -684,22 +697,23 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
             # Draw charging symbol in center if charging
             if is_charging:
-                center_x = 16
-                center_y = 16
+                center_x = size / 2.0
+                center_y = size / 2.0
+                offset = 4 * scale
                 bg_color = QtGui.QColor("#000000")
-                painter.setPen(QtGui.QPen(bg_color, 4.0))
-                painter.drawLine(center_x - 4, center_y, center_x + 4, center_y)
-                painter.drawLine(center_x, center_y - 4, center_x, center_y + 4)
+                painter.setPen(QtGui.QPen(bg_color, 4.0 * scale))
+                painter.drawLine(center_x - offset, center_y, center_x + offset, center_y)
+                painter.drawLine(center_x, center_y - offset, center_x, center_y + offset)
                 
-                painter.setPen(QtGui.QPen(color, 2.0))
-                painter.drawLine(center_x - 4, center_y, center_x + 4, center_y)
-                painter.drawLine(center_x, center_y - 4, center_x, center_y + 4)
+                painter.setPen(QtGui.QPen(color, 2.0 * scale))
+                painter.drawLine(center_x - offset, center_y, center_x + offset, center_y)
+                painter.drawLine(center_x, center_y - offset, center_x, center_y + offset)
             
             # Text will draw in center natively by text overlay if enabled
             
         else:
             color = QtGui.QColor(battery_color_hex)
-            pen_width = 1.2 if self.programmatic_style == 2 else 2.5
+            pen_width = (1.2 if self.programmatic_style == 2 else 2.5) * scale
             pen = QtGui.QPen(color, pen_width)
             painter.setPen(pen)
             
@@ -707,22 +721,22 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
             if is_horizontal:
                 # Draw Horizontal battery shape
-                shell_rect = QtCore.QRectF(2, 7, 24, 18)
-                term_rect = QtCore.QRectF(26, 12, 3, 8)
+                shell_rect = QtCore.QRectF(2 * scale, 7 * scale, 24 * scale, 18 * scale)
+                term_rect = QtCore.QRectF(26 * scale, 12 * scale, 3 * scale, 8 * scale)
                 
                 # Rounded capsule style rounding
-                shell_round = shell_rect.height() / 2.0 if self.programmatic_style == 3 else 3.0
+                shell_round = shell_rect.height() / 2.0 if self.programmatic_style == 3 else 3.0 * scale
                 painter.drawRoundedRect(shell_rect, shell_round, shell_round)
                 painter.setBrush(QtGui.QBrush(color))
-                painter.drawRoundedRect(term_rect, 1, 1)
+                painter.drawRoundedRect(term_rect, 1.0 * scale, 1.0 * scale)
                 
-                margin = 2.0 if self.programmatic_style == 2 else 4.0
+                margin = (2.0 if self.programmatic_style == 2 else 4.0) * scale
                 fill_width = shell_rect.width() - (margin * 2)
                 
                 if not show_text:
                     if self.programmatic_style == 1:
                         # Segmented (3 blocks)
-                        gap = 2.0
+                        gap = 2.0 * scale
                         seg_w = (fill_width - 2 * gap) / 3.0
                         for i in range(3):
                             if i == 0 and percentage < 15: continue
@@ -731,13 +745,13 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                             
                             x = shell_rect.x() + margin + seg_w * i + gap * i
                             seg_rect = QtCore.QRectF(x, shell_rect.y() + margin, seg_w, shell_rect.height() - (margin * 2))
-                            painter.drawRoundedRect(seg_rect, 1.0, 1.0)
+                            painter.drawRoundedRect(seg_rect, 1.0 * scale, 1.0 * scale)
                     else:
                         # Solid or Capsule
                         bar_w = max(0.0, fill_width * (percentage / 100.0))
                         if bar_w > 0:
                             fill_rect = QtCore.QRectF(shell_rect.x() + margin, shell_rect.y() + margin, bar_w, shell_rect.height() - (margin * 2))
-                            fill_round = fill_rect.height() / 2.0 if self.programmatic_style == 3 else 1.5
+                            fill_round = fill_rect.height() / 2.0 if self.programmatic_style == 3 else 1.5 * scale
                             
                             if is_gradient:
                                 grad = QtGui.QLinearGradient(fill_rect.left(), 0, fill_rect.right(), 0)
@@ -752,22 +766,22 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                             painter.drawRoundedRect(fill_rect, fill_round, fill_round)
             else:
                 # Draw Vertical battery shape
-                shell_rect = QtCore.QRectF(7, 5, 18, 25)
-                term_rect = QtCore.QRectF(12, 2, 8, 3)
+                shell_rect = QtCore.QRectF(7 * scale, 5 * scale, 18 * scale, 25 * scale)
+                term_rect = QtCore.QRectF(12 * scale, 2 * scale, 8 * scale, 3 * scale)
                 
                 # Rounded capsule style rounding
-                shell_round = shell_rect.width() / 2.0 if self.programmatic_style == 3 else 3.0
+                shell_round = shell_rect.width() / 2.0 if self.programmatic_style == 3 else 3.0 * scale
                 painter.drawRoundedRect(shell_rect, shell_round, shell_round)
                 painter.setBrush(QtGui.QBrush(color))
-                painter.drawRoundedRect(term_rect, 1, 1)
+                painter.drawRoundedRect(term_rect, 1.0 * scale, 1.0 * scale)
                 
-                margin = 2.0 if self.programmatic_style == 2 else 4.0
+                margin = (2.0 if self.programmatic_style == 2 else 4.0) * scale
                 fill_height = shell_rect.height() - (margin * 2)
                 
                 if not show_text:
                     if self.programmatic_style == 1:
                         # Segmented (3 blocks)
-                        gap = 2.0
+                        gap = 2.0 * scale
                         seg_h = (fill_height - 2 * gap) / 3.0
                         for i in range(3):
                             if i == 0 and percentage < 15: continue
@@ -776,13 +790,13 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                             
                             y = shell_rect.bottom() - margin - seg_h * (i + 1) - gap * i
                             seg_rect = QtCore.QRectF(shell_rect.x() + margin, y, shell_rect.width() - (margin * 2), seg_h)
-                            painter.drawRoundedRect(seg_rect, 1.0, 1.0)
+                            painter.drawRoundedRect(seg_rect, 1.0 * scale, 1.0 * scale)
                     else:
                         # Solid or Capsule
                         bar_h = max(0.0, fill_height * (percentage / 100.0))
                         if bar_h > 0:
                             fill_rect = QtCore.QRectF(shell_rect.x() + margin, shell_rect.bottom() - margin - bar_h, shell_rect.width() - (margin * 2), bar_h)
-                            fill_round = fill_rect.width() / 2.0 if self.programmatic_style == 3 else 1.5
+                            fill_round = fill_rect.width() / 2.0 if self.programmatic_style == 3 else 1.5 * scale
                             
                             if is_gradient:
                                 grad = QtGui.QLinearGradient(0, fill_rect.bottom(), 0, fill_rect.top())
@@ -799,32 +813,33 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Draw charging indicator (+ symbol) on top of battery shape if charging
         # (Only draw if standard shapes are active, Circular has its own charging symbol)
         if is_charging and self.programmatic_style != 5:
-            center_x = 14 if is_horizontal else 16
-            center_y = 16 if is_horizontal else 17
+            center_x = (14 if is_horizontal else 16) * scale
+            center_y = (16 if is_horizontal else 17) * scale
+            offset = 5 * scale
             
             # Thick black background glow outline
             bg_color = QtGui.QColor("#000000")
-            painter.setPen(QtGui.QPen(bg_color, 4))
-            painter.drawLine(center_x - 5, center_y, center_x + 5, center_y)
-            painter.drawLine(center_x, center_y - 5, center_x, center_y + 5)
+            painter.setPen(QtGui.QPen(bg_color, 4 * scale))
+            painter.drawLine(center_x - offset, center_y, center_x + offset, center_y)
+            painter.drawLine(center_x, center_y - offset, center_x, center_y + offset)
             
             # Main color stroke
             color = QtGui.QColor(battery_color_hex)
-            painter.setPen(QtGui.QPen(color, 2))
-            painter.drawLine(center_x - 5, center_y, center_x + 5, center_y)
-            painter.drawLine(center_x, center_y - 5, center_x, center_y + 5)
+            painter.setPen(QtGui.QPen(color, 2 * scale))
+            painter.drawLine(center_x - offset, center_y, center_x + offset, center_y)
+            painter.drawLine(center_x, center_y - offset, center_x, center_y + offset)
             
         elif show_text and self.query_success:
             # Draw percentage numbers inside the battery shell
-            font = QtGui.QFont("Inter", 8, QtGui.QFont.Weight.Bold)
+            font = QtGui.QFont("Inter", max(6, int(8 * scale)), QtGui.QFont.Weight.Bold)
             painter.setFont(font)
             
             txt = str(percentage)
             rect = QtCore.QRectF(0, 0, size, size)
             if is_horizontal and self.programmatic_style != 5:
-                rect.translate(-1, 0)
+                rect.translate(-1 * scale, 0)
             elif not is_horizontal and self.programmatic_style != 5:
-                rect.translate(0, 1)
+                rect.translate(0, 1 * scale)
                 
             # Outline/Shadow glow to guarantee legibility on any theme
             bg_color = QtGui.QColor("#000000")
@@ -833,7 +848,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
                     if dx != 0 or dy != 0:
-                        painter.drawText(rect.translated(dx, dy), QtAlignHCenter | QtAlignVCenter, txt)
+                        painter.drawText(rect.translated(dx * scale, dy * scale), QtAlignHCenter | QtAlignVCenter, txt)
                         
             # Inner text
             color = QtGui.QColor(battery_color_hex)
@@ -845,7 +860,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
 
     def load_svg_icon(self, filename, show_text, is_horizontal):
         svg_path = os.path.join(self.script_dir, "icons", filename)
-        size = 32
+        size = getattr(self, "icon_size", 32)
+        scale = size / 32.0
         pixmap = QtGui.QPixmap(size, size)
         pixmap.fill(QtGui.QColor(0, 0, 0, 0))
         
@@ -874,7 +890,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             painter.setRenderHint(QtGui.QPainter.Antialiasing)
             painter.setRenderHint(QtGui.QPainter.TextAntialiasing)
             
-            font = QtGui.QFont("Sans Serif", 9, QtGui.QFont.Bold)
+            font = QtGui.QFont("Sans Serif", max(6, int(9 * scale)), QtGui.QFont.Bold)
             painter.setFont(font)
             
             text = str(self.battery_percentage)
@@ -885,7 +901,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
                     if dx != 0 or dy != 0:
-                        painter.drawText(rect.translated(dx, dy), QtAlignHCenter | QtAlignVCenter, text)
+                        painter.drawText(rect.translated(dx * scale, dy * scale), QtAlignHCenter | QtAlignVCenter, text)
                         
             painter.setPen(QtGui.QColor("#2C3E50"))
             painter.drawText(rect, QtAlignHCenter | QtAlignVCenter, text)
