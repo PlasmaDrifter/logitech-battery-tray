@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Logitech Battery
+Comment=Logitech Battery Monitor System Tray Application
+Exec=python3 "/home/jmc/Source/Mouse Battery/logitech_battery.py"
+Icon=input-mouse
+Terminal=false
+Categories=Utility;
+StartupNotify=false

@@ -1,0 +1,18 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Local runtime settings and cache
+Settings.conf
+*.conf
+.gemini/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
