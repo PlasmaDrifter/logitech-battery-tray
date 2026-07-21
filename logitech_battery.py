@@ -466,18 +466,15 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             if elapsed < 0:
                 elapsed = 0
             
-            days = int(elapsed // 86400)
-            hours = int((elapsed % 86400) // 3600)
+            total_hours = int(elapsed // 3600)
             minutes = int((elapsed % 3600) // 60)
             
-            if days > 0:
-                time_str = f"{days}d {hours}h"
-            elif hours > 0:
-                time_str = f"{hours}h {minutes}m"
-            else:
+            if total_hours > 0:
+                time_str = f"{total_hours}h {minutes}m"
+            elif minutes > 0:
                 time_str = f"{minutes}m"
-                if minutes == 0:
-                    time_str = f"{int(elapsed)}s"
+            else:
+                time_str = f"{int(elapsed)}s"
             charged_text = f"Charged to 95%: {time_str} ago"
         else:
             charged_text = "Charged to 95%: Unknown"
@@ -612,17 +609,18 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         
         # Style 5 is Circular Ring Gauge
         if self.programmatic_style == 5:
-            rect = QtCore.QRectF(4, 4, 24, 24)
+            rect = QtCore.QRectF(5, 5, 22, 22)
+            stroke_w = 5.0
             
             # Background track ring
             track_color = QtGui.QColor("#3A3A3C")
-            painter.setPen(QtGui.QPen(track_color, 3.0))
+            painter.setPen(QtGui.QPen(track_color, stroke_w))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawArc(rect, 0, 360 * 16)
             
             # Progress arc overlay
             color = QtGui.QColor(battery_color_hex)
-            pen = QtGui.QPen(color, 3.0, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap)
+            pen = QtGui.QPen(color, stroke_w, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap)
             painter.setPen(pen)
             
             starting_angle = 90 * 16 # Top center
