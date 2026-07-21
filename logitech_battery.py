@@ -664,7 +664,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         
         # Style 5 is Circular Ring Gauge
         if self.programmatic_style == 5:
-            rect = QtCore.QRectF(5, 5, 22, 22)
+            rect = QtCore.QRectF(3, 3, 26, 26)
             stroke_w = 5.0
             
             # Background track ring (semi-transparent for high contrast on dark & light panels)
