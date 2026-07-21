@@ -667,8 +667,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             rect = QtCore.QRectF(5, 5, 22, 22)
             stroke_w = 5.0
             
-            # Background track ring
-            track_color = QtGui.QColor("#3A3A3C")
+            # Background track ring (semi-transparent for high contrast on dark & light panels)
+            track_color = QtGui.QColor(255, 255, 255, 60)
             painter.setPen(QtGui.QPen(track_color, stroke_w))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawArc(rect, 0, 360 * 16)
