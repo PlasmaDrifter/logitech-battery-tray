@@ -216,9 +216,9 @@ class SettingsDialog(QtWidgets.QDialog):
         current_hex = getattr(self, attr_name)
         init_color = QtGui.QColor(current_hex)
         if QtVariant == "PyQt5":
-            opts = QtWidgets.QColorDialog.ShowAlphaChannel
+            opts = QtWidgets.QColorDialog.ShowAlphaChannel | QtWidgets.QColorDialog.DontUseNativeDialog
         else:
-            opts = QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel
+            opts = QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel | QtWidgets.QColorDialog.ColorDialogOption.DontUseNativeDialog
         color = QtWidgets.QColorDialog.getColor(init_color, self, "Select Status Color", opts)
         if color.isValid():
             if color.alpha() < 255:
