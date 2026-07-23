@@ -139,21 +139,25 @@ class SettingsDialog(QtWidgets.QDialog):
         self.color_warning_val = self.app.color_warning
         self.color_critical_val = self.app.color_critical
         self.color_charging_val = self.app.color_charging
+        self.color_empty_val = getattr(self.app, "color_empty", "#3CFFFFFF")
 
         self.btn_color_normal = QtWidgets.QPushButton(self.color_normal_val)
         self.btn_color_warning = QtWidgets.QPushButton(self.color_warning_val)
         self.btn_color_critical = QtWidgets.QPushButton(self.color_critical_val)
         self.btn_color_charging = QtWidgets.QPushButton(self.color_charging_val)
+        self.btn_color_empty = QtWidgets.QPushButton(self.color_empty_val)
 
         self.update_btn_style(self.btn_color_normal, self.color_normal_val)
         self.update_btn_style(self.btn_color_warning, self.color_warning_val)
         self.update_btn_style(self.btn_color_critical, self.color_critical_val)
         self.update_btn_style(self.btn_color_charging, self.color_charging_val)
+        self.update_btn_style(self.btn_color_empty, self.color_empty_val)
 
         self.btn_color_normal.clicked.connect(lambda: self.pick_color("color_normal_val", self.btn_color_normal))
         self.btn_color_warning.clicked.connect(lambda: self.pick_color("color_warning_val", self.btn_color_warning))
         self.btn_color_critical.clicked.connect(lambda: self.pick_color("color_critical_val", self.btn_color_critical))
         self.btn_color_charging.clicked.connect(lambda: self.pick_color("color_charging_val", self.btn_color_charging))
+        self.btn_color_empty.clicked.connect(lambda: self.pick_color("color_empty_val", self.btn_color_empty))
 
         self.icon_scale_spin = QtWidgets.QSpinBox()
         self.icon_scale_spin.setRange(70, 140)
@@ -169,6 +173,7 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("Warning Level Color:", self.btn_color_warning)
         form.addRow("Critical Level Color:", self.btn_color_critical)
         form.addRow("Charging State Color:", self.btn_color_charging)
+        form.addRow("Empty Track Color:", self.btn_color_empty)
         form.addRow("Icon Direction Style:", self.layout_combo)
         form.addRow("Icon Source Set:", self.source_combo)
         form.addRow("Programmatic Draw Style:", self.prog_style_combo)
@@ -204,14 +209,22 @@ class SettingsDialog(QtWidgets.QDialog):
         qcol = QtGui.QColor(color_hex)
         lum = (0.299 * qcol.red() + 0.587 * qcol.green() + 0.114 * qcol.blue()) / 255.0
         text_col = "#000000" if lum > 0.5 else "#FFFFFF"
-        btn.setStyleSheet(f"QPushButton {{ background-color: {color_hex}; color: {text_col}; border: 1px solid #555; border-radius: 4px; padding: 4px; font-weight: bold; }}")
+        rgba_str = f"rgba({qcol.red()}, {qcol.green()}, {qcol.blue()}, {qcol.alpha() / 255.0:.2f})"
+        btn.setStyleSheet(f"QPushButton {{ background-color: {rgba_str}; color: {text_col}; border: 1px solid #555; border-radius: 4px; padding: 4px; font-weight: bold; }}")
 
     def pick_color(self, attr_name, btn_target):
         current_hex = getattr(self, attr_name)
         init_color = QtGui.QColor(current_hex)
-        color = QtWidgets.QColorDialog.getColor(init_color, self, "Select Status Color")
+        if QtVariant == "PyQt5":
+            opts = QtWidgets.QColorDialog.ShowAlphaChannel
+        else:
+            opts = QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel
+        color = QtWidgets.QColorDialog.getColor(init_color, self, "Select Status Color", opts)
         if color.isValid():
-            new_hex = color.name().upper()
+            if color.alpha() < 255:
+                new_hex = f"#{color.alpha():02X}{color.red():02X}{color.green():02X}{color.blue():02X}"
+            else:
+                new_hex = color.name().upper()
             setattr(self, attr_name, new_hex)
             self.update_btn_style(btn_target, new_hex)
             self.apply_settings()
@@ -251,6 +264,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.color_warning = self.color_warning_val
         self.app.color_critical = self.color_critical_val
         self.app.color_charging = self.color_charging_val
+        self.app.color_empty = self.color_empty_val
         
         self.app.settings.setValue("warning_threshold", warn_val)
         self.app.settings.setValue("critical_threshold", crit_val)
@@ -266,6 +280,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.settings.setValue("color_warning", self.color_warning_val)
         self.app.settings.setValue("color_critical", self.color_critical_val)
         self.app.settings.setValue("color_charging", self.color_charging_val)
+        self.app.settings.setValue("color_empty", self.color_empty_val)
         
         self.app.toggle_autostart(autostart)
         self.app.poll_timer.setInterval(interval_val * 1000)
@@ -323,6 +338,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.color_warning = self.settings.value("color_warning", "#F39C12", type=str)
         self.color_critical = self.settings.value("color_critical", "#FF6B6B", type=str)
         self.color_charging = self.settings.value("color_charging", "#2ECC71", type=str)
+        self.color_empty = self.settings.value("color_empty", "#3CFFFFFF", type=str)
         
         # Load charged timestamp (float or None)
         self.last_charged_time = self.settings.value("last_charged_time", 0.0, type=float)
@@ -686,8 +702,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             rect = QtCore.QRectF(3, 3, 26, 26)
             stroke_w = 5.0
             
-            # Background track ring (semi-transparent for high contrast on dark & light panels)
-            track_color = QtGui.QColor(255, 255, 255, 60)
+            # Background track ring (customizable color, default to semi-transparent white)
+            track_color = QtGui.QColor(getattr(self, "color_empty", "#3CFFFFFF"))
             painter.setPen(QtGui.QPen(track_color, stroke_w))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawArc(rect, 0, 360 * 16)
