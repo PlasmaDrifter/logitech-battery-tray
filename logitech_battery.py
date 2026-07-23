@@ -139,7 +139,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.color_warning_val = self.app.color_warning
         self.color_critical_val = self.app.color_critical
         self.color_charging_val = self.app.color_charging
-        self.color_empty_val = getattr(self.app, "color_empty", "#3CFFFFFF")
+        self.color_empty_val = getattr(self.app, "color_empty", "#FFFFFF")
 
         self.btn_color_normal = QtWidgets.QPushButton(self.color_normal_val)
         self.btn_color_warning = QtWidgets.QPushButton(self.color_warning_val)
@@ -166,6 +166,13 @@ class SettingsDialog(QtWidgets.QDialog):
         self.icon_scale_spin.setSingleStep(5)
         self.icon_scale_spin.valueChanged.connect(self.apply_settings)
 
+        self.track_opacity_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.track_opacity_slider.setRange(0, 100)
+        self.track_opacity_slider.setValue(getattr(self.app, "track_opacity", 25))
+        self.track_opacity_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        self.track_opacity_slider.setTickInterval(10)
+        self.track_opacity_slider.valueChanged.connect(self.apply_settings)
+
         form.addRow("Warning (Orange) Threshold:", self.warning_spin)
         form.addRow("Critical (Red) Threshold:", self.critical_spin)
         form.addRow("Tray Icon Visual Zoom:", self.icon_scale_spin)
@@ -174,6 +181,7 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("Critical Level Color:", self.btn_color_critical)
         form.addRow("Charging State Color:", self.btn_color_charging)
         form.addRow("Empty Track Color:", self.btn_color_empty)
+        form.addRow("Empty Track Opacity:", self.track_opacity_slider)
         form.addRow("Icon Direction Style:", self.layout_combo)
         form.addRow("Icon Source Set:", self.source_combo)
         form.addRow("Programmatic Draw Style:", self.prog_style_combo)
@@ -215,16 +223,11 @@ class SettingsDialog(QtWidgets.QDialog):
     def pick_color(self, attr_name, btn_target):
         current_hex = getattr(self, attr_name)
         init_color = QtGui.QColor(current_hex)
-        if QtVariant == "PyQt5":
-            opts = QtWidgets.QColorDialog.ShowAlphaChannel | QtWidgets.QColorDialog.DontUseNativeDialog
-        else:
-            opts = QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel | QtWidgets.QColorDialog.ColorDialogOption.DontUseNativeDialog
-        color = QtWidgets.QColorDialog.getColor(init_color, self, "Select Status Color", opts)
+        init_color.setAlpha(255) # force color picker starting state to be solid
+        
+        color = QtWidgets.QColorDialog.getColor(init_color, self, "Select Color")
         if color.isValid():
-            if color.alpha() < 255:
-                new_hex = f"#{color.alpha():02X}{color.red():02X}{color.green():02X}{color.blue():02X}"
-            else:
-                new_hex = color.name().upper()
+            new_hex = color.name().upper()
             setattr(self, attr_name, new_hex)
             self.update_btn_style(btn_target, new_hex)
             self.apply_settings()
@@ -265,6 +268,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.color_critical = self.color_critical_val
         self.app.color_charging = self.color_charging_val
         self.app.color_empty = self.color_empty_val
+        self.app.track_opacity = self.track_opacity_slider.value()
         
         self.app.settings.setValue("warning_threshold", warn_val)
         self.app.settings.setValue("critical_threshold", crit_val)
@@ -281,6 +285,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.settings.setValue("color_critical", self.color_critical_val)
         self.app.settings.setValue("color_charging", self.color_charging_val)
         self.app.settings.setValue("color_empty", self.color_empty_val)
+        self.app.settings.setValue("track_opacity", self.app.track_opacity)
         
         self.app.toggle_autostart(autostart)
         self.app.poll_timer.setInterval(interval_val * 1000)
@@ -338,7 +343,13 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.color_warning = self.settings.value("color_warning", "#F39C12", type=str)
         self.color_critical = self.settings.value("color_critical", "#FF6B6B", type=str)
         self.color_charging = self.settings.value("color_charging", "#2ECC71", type=str)
-        self.color_empty = self.settings.value("color_empty", "#3CFFFFFF", type=str)
+        self.color_empty = self.settings.value("color_empty", "#FFFFFF", type=str)
+        
+        # Clean any old #AARRGGBB hex codes to #RRGGBB
+        if len(self.color_empty) == 9:
+            self.color_empty = "#" + self.color_empty[3:]
+            
+        self.track_opacity = self.settings.value("track_opacity", 25, type=int)
         
         # Load charged timestamp (float or None)
         self.last_charged_time = self.settings.value("last_charged_time", 0.0, type=float)
@@ -702,8 +713,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             rect = QtCore.QRectF(3, 3, 26, 26)
             stroke_w = 5.0
             
-            # Background track ring (customizable color, default to semi-transparent white)
-            track_color = QtGui.QColor(getattr(self, "color_empty", "#3CFFFFFF"))
+            # Background track ring (customizable color & opacity, default to 25% white)
+            track_color = QtGui.QColor(getattr(self, "color_empty", "#FFFFFF"))
+            track_opacity_val = getattr(self, "track_opacity", 25)
+            track_color.setAlpha(int((track_opacity_val / 100.0) * 255))
             painter.setPen(QtGui.QPen(track_color, stroke_w))
             painter.setBrush(QtCore.Qt.NoBrush)
             painter.drawArc(rect, 0, 360 * 16)
