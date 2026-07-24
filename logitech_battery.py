@@ -557,18 +557,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Calculate and format elapsed time since charged
         if self.last_charged_time > 0.0:
             elapsed = time.time() - self.last_charged_time
-            if elapsed < 0:
-                elapsed = 0
-            
-            total_hours = int(elapsed // 3600)
-            minutes = int((elapsed % 3600) // 60)
-            
-            if total_hours > 0:
-                time_str = f"{total_hours}h {minutes}m"
-            elif minutes > 0:
-                time_str = f"{minutes}m"
-            else:
-                time_str = f"{int(elapsed)}s"
+            time_str = self.format_duration(elapsed)
             charged_text = f"Charged to 95%: {time_str} ago"
         else:
             charged_text = "Charged to 95%: Unknown"
@@ -606,6 +595,23 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                 self.battery_history.pop(0)
             self.settings.setValue("battery_history", json.dumps(self.battery_history))
 
+    def format_duration(self, seconds):
+        if seconds < 0:
+            seconds = 0
+        days = int(seconds // 86400)
+        hours = int((seconds % 86400) // 3600)
+        minutes = int((seconds % 3600) // 60)
+        
+        parts = []
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0 or days > 0:
+            parts.append(f"{hours}h")
+        if days == 0 and hours == 0 and minutes == 0:
+            return f"{int(seconds)}s"
+        parts.append(f"{minutes}m")
+        return " ".join(parts)
+
     def estimate_hours_left(self, current_percentage):
         if self.is_charging:
             return ""
@@ -614,7 +620,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             # Default fallback: ~120 hours total life (0.83% drop per hour)
             default_rate = 0.83
             hours = current_percentage / default_rate
-            return f" (~{int(hours)}h left)"
+            time_str = self.format_duration(hours * 3600)
+            return f" (~{time_str} left)"
             
         first = self.battery_history[0]
         last = self.battery_history[-1]
@@ -625,7 +632,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         if pct_drop <= 0 or time_elapsed < 60:
             default_rate = 0.83
             hours = current_percentage / default_rate
-            return f" (~{int(hours)}h left)"
+            time_str = self.format_duration(hours * 3600)
+            return f" (~{time_str} left)"
             
         hours_elapsed = time_elapsed / 3600.0
         drain_rate = pct_drop / hours_elapsed
@@ -636,7 +644,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             drain_rate = 10.0
             
         hours = current_percentage / drain_rate
-        return f" (~{int(hours)}h left)"
+        time_str = self.format_duration(hours * 3600)
+        return f" (~{time_str} left)"
 
     def update_icon(self):
         if self.icon_style == 1:
@@ -979,7 +988,7 @@ Type=Application
 Version=1.0
 Name=Logitech Battery
 Comment=Logitech Battery Monitor System Tray Application
-Exec=python3 {os.path.abspath(__file__)}
+Exec=python3 "{os.path.abspath(__file__)}"
 Icon=input-mouse
 Terminal=false
 Categories=Utility;System;
@@ -988,7 +997,7 @@ StartupNotify=false
             try:
                 with open(desktop_file, "w") as f:
                     f.write(content)
-                os.chmod(desktop_file, 0o755)
+                os.chmod(desktop_file, 0o644)
             except Exception as e:
                 print(f"Error creating autostart entry: {e}")
         else:
