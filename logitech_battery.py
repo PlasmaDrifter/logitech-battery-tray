@@ -6,6 +6,8 @@ import time
 import subprocess
 import setproctitle
 
+__version__ = "1.1.0"
+
 # 1. Dynamic Qt Bindings Discovery & Compatibility layer
 try:
     from PySide6 import QtWidgets, QtGui, QtCore
@@ -414,7 +416,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.status_action = QActionClass("Querying state...", self.menu)
         self.menu.addAction(self.status_action)
         
-        self.charged_time_action = QActionClass("Charged to 95%: Unknown", self.menu)
+        self.charged_time_action = QActionClass("Charged to 95+%: Unknown", self.menu)
         self.menu.addAction(self.charged_time_action)
         
         self.menu.addSeparator()
@@ -558,9 +560,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         if self.last_charged_time > 0.0:
             elapsed = time.time() - self.last_charged_time
             time_str = self.format_duration(elapsed)
-            charged_text = f"Charged to 95%: {time_str} ago"
+            charged_text = f"Charged to 95+%: {time_str} ago"
         else:
-            charged_text = "Charged to 95%: Unknown"
+            charged_text = "Charged to 95+%: Unknown"
             
         self.charged_time_action.setText(charged_text)
         self.tray_icon.setToolTip(f"{self.device_name}\nCharge: {self.battery_percentage}%{estimate}\n{charged_text}")
@@ -588,8 +590,19 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         last_point = self.battery_history[-1]
         
+        # If charged to 95% or more, or if battery percentage increased, reset history
+        if percentage >= 95 and (last_point.get("percent", 0) < 95 or any(p.get("percent", 0) < 95 for p in self.battery_history)):
+            self.battery_history = [{"time": now, "percent": percentage}]
+            self.settings.setValue("battery_history", json.dumps(self.battery_history))
+            return
+
+        if percentage > last_point.get("percent", 0):
+            self.battery_history = [{"time": now, "percent": percentage}]
+            self.settings.setValue("battery_history", json.dumps(self.battery_history))
+            return
+            
         # If the percentage dropped, log it
-        if percentage < last_point["percent"]:
+        if percentage < last_point.get("percent", 0):
             self.battery_history.append({"time": now, "percent": percentage})
             if len(self.battery_history) > 10:
                 self.battery_history.pop(0)

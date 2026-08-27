@@ -1,5 +1,6 @@
 # Logitech Battery Monitor System Tray
 
+[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)](https://github.com/PlasmaDrifter/logitech-battery-tray)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%2FPyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![Linux](https://img.shields.io/badge/Platform-Linux%20%2F%20KDE%20Plasma-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kde.org/plasma-desktop/)
@@ -26,7 +27,7 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 
 - **Direct HID Probing**: Queries battery percentages and charging states directly from Logitech USB wireless receivers via HID++ protocols.
 - **Hours-Remaining Estimator**: Tracks historical discharge rates over time and calculates a moving average to display estimated remaining battery life (`~72h left`).
-- **Last Charge Timestamp Tracking**: Records the exact moment the battery was charged to $\ge 95\%$, persisting the time elapsed (`Charged to 95%: 2d 6h ago`) across system reboots.
+- **Last Charge Timestamp Tracking**: Records the exact moment the battery was charged to $\ge 95\%$, persisting the time elapsed (`Charged to 95+%: 2d 6h ago`) across system reboots.
 - **6 Programmatic Vector Styles**:
   - **Solid Continuous**: Standard continuous level fill bar.
   - **Segmented (3 Blocks)**: Renders low, medium, and high charge levels inside three distinct visual segment slots.
@@ -87,7 +88,7 @@ python3 logitech_battery.py
 ### System Tray Right-Click Menu
 - **Logitech Device**: Device model name.
 - **Battery Status**: Current percentage, remaining hours estimate, and charging state.
-- **Charged to 95%**: Elapsed time since the battery was last fully charged.
+- **Charged to 95+%**: Elapsed time since the battery was last fully charged.
 - **Refresh Now**: Force an immediate battery query.
 - **Refresh Interval**: Select polling interval (5s, 10s, 30s, 60s).
 - **Start on Boot**: Enable/disable autostart entry in `~/.config/autostart`.
