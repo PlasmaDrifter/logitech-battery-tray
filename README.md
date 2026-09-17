@@ -1,5 +1,6 @@
 # Logitech Battery Monitor System Tray
 
+[![Reddit](https://img.shields.io/badge/Reddit-r%2FPlasmaDrifterProjects-FF4500?style=flat-square&logo=reddit&logoColor=white)](https://reddit.com/r/PlasmaDrifterProjects)
 [![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)](https://github.com/PlasmaDrifter/logitech-battery-tray)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%2FPyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
@@ -106,3 +107,11 @@ Settings are saved in standard INI format at:
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## 💬 Community & Discussions
+
+Got questions, setup ideas, or feedback?
+
+* 🌐 Join our subreddit at [**r/PlasmaDrifterProjects**](https://reddit.com/r/PlasmaDrifterProjects) to discuss updates, get support, and share configurations.
