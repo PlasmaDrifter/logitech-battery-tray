@@ -1,11 +1,13 @@
 # Logitech Battery Monitor System Tray
 
-[![Reddit](https://img.shields.io/badge/Reddit-r%2FPlasmaDrifterProjects-FF4500?style=flat-square&logo=reddit&logoColor=white)](https://reddit.com/r/PlasmaDrifterProjects)
 [![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)](https://github.com/PlasmaDrifter/logitech-battery-tray)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%2FPyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![Linux](https://img.shields.io/badge/Platform-Linux%20%2F%20KDE%20Plasma-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kde.org/plasma-desktop/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+
+> [!NOTE]
+> **Community Hub:** Have questions, custom configs, or feature ideas? Join our subreddit community at [**r/PlasmaDrifterProjects**](https://reddit.com/r/PlasmaDrifterProjects)!
 
 A lightweight, feature-rich system tray battery monitor for Logitech wireless mice (such as the G502 X, PRO X Superlight, G305, etc.) on Linux desktops. Built natively with Python and PySide6/PyQt5, it provides real-time charge monitoring, battery depletion rate estimation, custom vector layouts, and colored icon themes with zero background CPU overhead.
 
