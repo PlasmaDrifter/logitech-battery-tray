@@ -1,6 +1,6 @@
 # Logitech Battery Monitor System Tray
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue?style=for-the-badge)](https://github.com/PlasmaDrifter/logitech-battery-tray)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue?style=for-the-badge)](https://github.com/PlasmaDrifter/logitech-battery-tray)
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6%2FPyQt5-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![Linux](https://img.shields.io/badge/Platform-Linux%20%2F%20KDE%20Plasma-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kde.org/plasma-desktop/)

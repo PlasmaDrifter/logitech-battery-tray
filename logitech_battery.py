@@ -6,7 +6,7 @@ import time
 import subprocess
 import setproctitle
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 # 1. Dynamic Qt Bindings Discovery & Compatibility layer
 try:
@@ -508,12 +508,15 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                     self.is_debouncing = True
                     self.debounce_target_percentage = new_percentage
                     self.debounce_target_charging = new_charging
-                    # Single shot 2 seconds timer
+                    # Single shot 2 seconds timer to confirm
                     QtCore.QTimer.singleShot(2000, self.confirm_debounce)
+                    return
                 else:
+                    self.is_debouncing = False
                     if new_percentage == self.debounce_target_percentage and new_charging == self.debounce_target_charging:
-                        self.is_debouncing = False
                         self.apply_battery_data(new_percentage, new_charging)
+                    else:
+                        return
             else:
                 self.is_debouncing = False
                 self.apply_battery_data(new_percentage, new_charging)
@@ -532,7 +535,6 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.update_icon()
 
     def confirm_debounce(self):
-        self.is_debouncing = False
         self.start_query()
 
     def apply_battery_data(self, percentage, is_charging):

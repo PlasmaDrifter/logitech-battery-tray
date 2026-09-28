@@ -35,22 +35,26 @@ def get_logitech_hidraw_devices():
                 })
         except Exception:
             pass
+    # Prioritize dedicated mouse/keyboard devices over generic USB receiver nodes
+    devices.sort(key=lambda d: 1 if 'receiver' in d['name'].lower() else 0)
     return devices
 
-def query_feature_index(fd, device_idx, feature_id):
-    cmd = bytearray([0x10, device_idx, 0x00, 0x0d, (feature_id >> 8) & 0xff, feature_id & 0xff, 0x00])
+def query_feature_index(fd, device_idx, feature_id, sw_id=0x01):
+    expected_fn_sw = (0x0 << 4) | (sw_id & 0x0f)
+    cmd = bytearray([0x10, device_idx, 0x00, expected_fn_sw, (feature_id >> 8) & 0xff, feature_id & 0xff, 0x00])
     try:
         os.write(fd, cmd)
     except Exception:
         return None
 
-    for _ in range(15):
+    for _ in range(25):
         time.sleep(0.02)
         try:
             data = os.read(fd, 20)
             if data and (data[0] == 0x10 or data[0] == 0x11):
-                if len(data) >= 5 and data[2] == 0x00 and data[3] == 0x0d:
-                    return data[4]
+                if len(data) >= 5 and data[2] == 0x00 and data[3] == expected_fn_sw:
+                    feat_idx = data[4]
+                    return feat_idx if feat_idx > 0 else None
         except BlockingIOError:
             continue
         except Exception:
@@ -70,24 +74,33 @@ def query_battery(dev_path, device_idx):
         except Exception:
             pass
 
-        # 1. Try Unified Battery (0x1004)
-        feature_idx = query_feature_index(fd, device_idx, 0x1004)
+        # 1. Try Unified Battery (0x1004) with sw_id=0x01
+        feature_idx = query_feature_index(fd, device_idx, 0x1004, sw_id=0x01)
         if feature_idx and feature_idx > 0:
-            bat_cmd = bytearray([0x10, device_idx, feature_idx, 0x1d, 0x00, 0x00, 0x00])
+            sw_id = 0x02
+            expected_fn_sw = (0x1 << 4) | (sw_id & 0x0f)
+            bat_cmd = bytearray([0x10, device_idx, feature_idx, expected_fn_sw, 0x00, 0x00, 0x00])
             try:
                 os.write(fd, bat_cmd)
             except Exception:
                 return None
 
-            for _ in range(15):
+            for _ in range(25):
                 time.sleep(0.02)
                 try:
                     data = os.read(fd, 20)
                     if data and (data[0] == 0x10 or data[0] == 0x11):
-                        if len(data) >= 7 and data[2] == feature_idx and data[3] == 0x1d:
+                        if len(data) >= 7 and data[2] == feature_idx and data[3] == expected_fn_sw:
                             percentage = data[4]
                             status_code = data[6]
-                            is_charging = status_code in [0x01, 0x03, 0x04]
+                            # In HID++ 0x1004 (Unified Battery):
+                            # 0x00: Discharging
+                            # 0x01: Charging
+                            # 0x02: ChargingNearlyFull
+                            # 0x03: Full (charge complete on charger)
+                            # 0x04: ChargingSlow
+                            # 0x05-0x07: Errors
+                            is_charging = status_code in [0x01, 0x02, 0x03, 0x04]
                             return {
                                 'percentage': percentage,
                                 'status_code': status_code,
@@ -98,30 +111,41 @@ def query_battery(dev_path, device_idx):
                     continue
                 except Exception:
                     break
+            # Do not fall back to 0x1000 if 0x1004 was already identified on this device
+            return None
 
-        # 2. Try Fallback: Legacy Battery Status (0x1000)
+        # 2. Try Fallback: Legacy Battery Status (0x1000) with sw_id=0x03
         try:
             while os.read(fd, 20): pass
         except Exception:
             pass
 
-        feature_idx = query_feature_index(fd, device_idx, 0x1000)
+        feature_idx = query_feature_index(fd, device_idx, 0x1000, sw_id=0x03)
         if feature_idx and feature_idx > 0:
-            bat_cmd = bytearray([0x10, device_idx, feature_idx, 0x0d, 0x00, 0x00, 0x00])
+            sw_id = 0x04
+            expected_fn_sw = (0x0 << 4) | (sw_id & 0x0f)
+            bat_cmd = bytearray([0x10, device_idx, feature_idx, expected_fn_sw, 0x00, 0x00, 0x00])
             try:
                 os.write(fd, bat_cmd)
             except Exception:
                 return None
 
-            for _ in range(15):
+            for _ in range(25):
                 time.sleep(0.02)
                 try:
                     data = os.read(fd, 20)
                     if data and (data[0] == 0x10 or data[0] == 0x11):
-                        if len(data) >= 7 and data[2] == feature_idx and data[3] == 0x0d:
+                        if len(data) >= 7 and data[2] == feature_idx and data[3] == expected_fn_sw:
                             percentage = data[4]
                             status_code = data[6]
-                            is_charging = status_code in [0x01, 0x03, 0x04]
+                            # In HID++ 0x1000 (Battery Status):
+                            # 0x00: Discharging
+                            # 0x01: Recharging
+                            # 0x02: Almost full
+                            # 0x03: Full
+                            # 0x04: Slow recharge
+                            # 0x05: Invalid battery
+                            is_charging = status_code in [0x01, 0x02, 0x03, 0x04]
                             return {
                                 'percentage': percentage,
                                 'status_code': status_code,
