@@ -229,7 +229,18 @@ class SettingsDialog(QtWidgets.QDialog):
         self.track_opacity_slider.setTickInterval(10)
         self.track_opacity_slider.valueChanged.connect(self.apply_settings)
 
-        form.addRow("Warning (Orange) Threshold:", self.warning_spin)
+        warning_layout = QtWidgets.QHBoxLayout()
+        warning_layout.addWidget(self.warning_spin)
+        
+        self.tip_btn = QtWidgets.QToolButton()
+        self.tip_btn.setIcon(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")))
+        self.tip_btn.setToolTip("Click to view 95% Charge Threshold Tip")
+        self.tip_btn.setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 4px; padding: 2px; } QToolButton:hover { background: #3d3d3d; }")
+        self.tip_btn.clicked.connect(self.show_tip_popup)
+        warning_layout.addWidget(self.tip_btn)
+        warning_layout.addStretch()
+
+        form.addRow("Warning (Orange) Threshold:", warning_layout)
         form.addRow("Critical (Red) Threshold:", self.critical_spin)
         form.addRow("Tray Icon Visual Zoom:", self.icon_scale_spin)
         form.addRow("Normal Level Color:", self.btn_color_normal)
@@ -268,19 +279,7 @@ class SettingsDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QDialogButtonBox(OkButton | CancelButton)
         buttons.accepted.connect(self.save_settings)
         buttons.rejected.connect(self.reject)
-        
-        # Bottom row with Tip icon button on the left and OK/Cancel on the right
-        bottom_layout = QtWidgets.QHBoxLayout()
-        tip_btn = QtWidgets.QToolButton()
-        tip_btn.setIcon(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")))
-        tip_btn.setToolTip("Click to view 95% Charge Threshold Tip")
-        tip_btn.setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 4px; padding: 4px; } QToolButton:hover { background: #3d3d3d; }")
-        tip_btn.clicked.connect(self.show_tip_popup)
-        bottom_layout.addWidget(tip_btn)
-        bottom_layout.addStretch()
-        bottom_layout.addWidget(buttons)
-        
-        layout.addLayout(bottom_layout)
+        layout.addWidget(buttons)
         
         self.validate_thresholds()
         self.update_theme_combo_state()
