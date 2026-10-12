@@ -484,30 +484,33 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             return QtGui.QIcon.fromTheme("battery-charging" if is_charging else ("battery-good" if percentage >= 50 else "battery-low"))
 
     def get_checkbox_icon(self, checked):
-        name = "checkbox-checked" if checked else "checkbox"
-        icon = QtGui.QIcon.fromTheme(name)
-        if not icon.isNull():
-            return icon
-        # Fallback drawn icon
+        # Always draw clean vector checkbox to ensure reliable distinction across all icon themes
         pix = QtGui.QPixmap(24, 24)
-        pix.fill(QtCore.Qt.transparent)
+        pix.fill(QtGui.QColor(0, 0, 0, 0))
+        
+        NoPen = getattr(QtCore.Qt.PenStyle, 'NoPen', getattr(QtCore.Qt, 'NoPen', 0))
+        NoBrush = getattr(QtCore.Qt.BrushStyle, 'NoBrush', getattr(QtCore.Qt, 'NoBrush', 0))
+        RoundCap = getattr(QtCore.Qt.PenCapStyle, 'RoundCap', getattr(QtCore.Qt, 'RoundCap', 0x20))
+        RoundJoin = getattr(QtCore.Qt.PenJoinStyle, 'RoundJoin', getattr(QtCore.Qt, 'RoundJoin', 0x40))
+        Antialiasing = getattr(QtGui.QPainter.RenderHint, 'Antialiasing', getattr(QtGui.QPainter, 'Antialiasing', 1))
+        
         p = QtGui.QPainter(pix)
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        p.setRenderHint(Antialiasing)
         rect = QtCore.QRectF(3, 3, 18, 18)
         if checked:
             p.setBrush(QtGui.QBrush(QtGui.QColor("#2ecc71")))
-            p.setPen(QtCore.Qt.NoPen)
+            p.setPen(NoPen)
             p.drawRoundedRect(rect, 4, 4)
             pen = QtGui.QPen(QtGui.QColor("#ffffff"), 2.2)
-            pen.setCapStyle(QtCore.Qt.RoundCap)
-            pen.setJoinStyle(QtCore.Qt.RoundJoin)
+            pen.setCapStyle(RoundCap)
+            pen.setJoinStyle(RoundJoin)
             p.setPen(pen)
             p.drawLine(QtCore.QPointF(7, 12), QtCore.QPointF(10.5, 15.5))
             p.drawLine(QtCore.QPointF(10.5, 15.5), QtCore.QPointF(17, 8.5))
         else:
             pen = QtGui.QPen(QtGui.QColor("#888888"), 1.8)
             p.setPen(pen)
-            p.setBrush(QtCore.Qt.NoBrush)
+            p.setBrush(NoBrush)
             p.drawRoundedRect(rect, 4, 4)
         p.end()
         return QtGui.QIcon(pix)
@@ -573,7 +576,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # 4. Autostart checkbox
         self.action_autostart = QActionClass("Start on Boot", self.menu)
         self.action_autostart.setIcon(self.get_checkbox_icon(self.autostart_enabled))
-        self.action_autostart.triggered.connect(lambda: self.toggle_autostart(not self.autostart_enabled))
+        self.action_autostart.triggered.connect(lambda checked=False: self.toggle_autostart(not self.autostart_enabled))
         self.menu.addAction(self.action_autostart)
         
         # 5. Preferences settings panel launcher
@@ -1186,12 +1189,17 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         
         if checked:
             os.makedirs(autostart_dir, exist_ok=True)
+            launcher_path = os.path.expanduser("~/.local/bin/logitech-battery-tray")
+            if os.path.exists(launcher_path):
+                exec_cmd = launcher_path
+            else:
+                exec_cmd = f'python3 "{os.path.abspath(__file__)}"'
             content = f"""[Desktop Entry]
 Type=Application
 Version=1.0
 Name=Logitech Battery
-Comment=Logitech Battery Monitor System Tray Application
-Exec=python3 "{os.path.abspath(__file__)}"
+Comment=Logitech wireless mouse and device battery monitor tray application
+Exec={exec_cmd}
 Icon=logitech-battery-tray
 Terminal=false
 Categories=Utility;Qt;
