@@ -500,11 +500,11 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.time_left_action.setIcon(QtGui.QIcon.fromTheme("preferences-system-time", QtGui.QIcon.fromTheme("clock")))
         self.menu.addAction(self.time_left_action)
         
-        self.state_action = QActionClass("State: Discharging", self.menu)
+        self.state_action = QActionClass("Discharging", self.menu)
         self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
         self.menu.addAction(self.state_action)
         
-        self.time_on_battery_action = QActionClass("On Battery: Unknown", self.menu)
+        self.time_on_battery_action = QActionClass("Runtime: Unknown", self.menu)
         self.time_on_battery_action.setIcon(QtGui.QIcon.fromTheme("document-open-recent", QtGui.QIcon.fromTheme("preferences-system-time")))
         self.menu.addAction(self.time_on_battery_action)
         
@@ -631,15 +631,15 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             if hasattr(self, 'time_left_action'):
                 self.time_left_action.setVisible(False)
             if hasattr(self, 'state_action'):
-                self.state_action.setText("State: Disconnected")
+                self.state_action.setText("Disconnected")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("dialog-warning", QtGui.QIcon.fromTheme("network-offline")))
             if hasattr(self, 'time_on_battery_action'):
                 if self.has_valid_data and self.last_charged_time > 0.0:
                     elapsed = time.time() - self.last_charged_time
                     time_str = self.format_duration(elapsed)
-                    self.time_on_battery_action.setText(f"On Battery: {time_str}")
+                    self.time_on_battery_action.setText(f"Runtime: {time_str}")
                 else:
-                    self.time_on_battery_action.setText("On Battery: Unknown")
+                    self.time_on_battery_action.setText("Runtime: Unknown")
             self.tray_icon.setToolTip(f"Logitech Battery Monitor\n{self.error_details}")
             
         self.update_icon()
@@ -679,10 +679,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         
         if hasattr(self, 'state_action'):
             if self.is_charging:
-                self.state_action.setText("State: Charging")
+                self.state_action.setText("Charging")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
             else:
-                self.state_action.setText("State: Discharging")
+                self.state_action.setText("Discharging")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-good", QtGui.QIcon.fromTheme("weather-storm")))
         
         # Calculate and format elapsed time on battery
@@ -692,10 +692,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             if self.is_charging:
                 on_batt_text = f"On Charger: {time_str}"
             else:
-                on_batt_text = f"On Battery: {time_str}"
+                on_batt_text = f"Runtime: {time_str}"
             charged_text = f"Charged to 95+%: {time_str} ago"
         else:
-            on_batt_text = "On Battery: Unknown"
+            on_batt_text = "Runtime: Unknown"
             charged_text = "Charged to 95+%: Unknown"
             
         if hasattr(self, 'time_on_battery_action'):
