@@ -507,11 +507,17 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Thread worker setup
         self.worker = None
         
-        # History setup
+        # History and smart estimator setup
         try:
             self.battery_history = json.loads(self.settings.value("battery_history", "[]"))
         except Exception:
             self.battery_history = []
+        
+        self.learned_drain_rate = self.settings.value("learned_drain_rate", 0.83, type=float)
+        self.cycle_active_seconds = self.settings.value("cycle_active_seconds", 0.0, type=float)
+        self.cycle_start_percent = self.settings.value("cycle_start_percent", 100, type=int)
+        self.last_poll_time = time.time()
+        self.charge_start_percent = None
         
         # Initialize UI Components
         self.init_tray()
@@ -758,11 +764,15 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.battery_percentage = percentage
         self.is_charging = is_charging
         
-        # Update charge timestamp if conditions met
+        # Update charge timestamp and full cycle state if conditions met
         charged_thresh = getattr(self, "charged_threshold", 95)
         if percentage >= charged_thresh or (is_charging and percentage >= charged_thresh):
             self.last_charged_time = time.time()
             self.settings.setValue("last_charged_time", self.last_charged_time)
+            self.cycle_active_seconds = 0.0
+            self.cycle_start_percent = percentage
+            self.settings.setValue("cycle_active_seconds", 0.0)
+            self.settings.setValue("cycle_start_percent", percentage)
             
         self.update_battery_history(percentage, is_charging)
         estimate = self.estimate_hours_left(percentage)
@@ -822,39 +832,83 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.has_valid_data = True
 
     def update_battery_history(self, percentage, is_charging):
-        # Reset history if charging starts
-        if is_charging:
-            if self.battery_history:
-                self.battery_history = []
-                self.settings.setValue("battery_history", "[]")
-            return
-            
         now = time.time()
-        
+        poll_gap = now - getattr(self, "last_poll_time", now)
+        self.last_poll_time = now
+        max_normal_gap = max(self.poll_interval * 4, 300)
+
+        # Handle charging state without prematurely wiping history on brief plug-ins
+        if is_charging:
+            if self.charge_start_percent is None:
+                self.charge_start_percent = percentage
+
+            charged_thresh = getattr(self, "charged_threshold", 95)
+            # Only reset if reached full charge threshold or gained >= 3%
+            if percentage >= charged_thresh or (percentage >= self.charge_start_percent + 3):
+                if self.battery_history:
+                    self.battery_history = []
+                    self.settings.setValue("battery_history", "[]")
+                self.cycle_active_seconds = 0.0
+                self.cycle_start_percent = percentage
+                self.settings.setValue("cycle_active_seconds", 0.0)
+                self.settings.setValue("cycle_start_percent", percentage)
+            return
+
+        # If user just unplugged:
+        if self.charge_start_percent is not None:
+            if percentage >= (self.charge_start_percent + 3):
+                # Substantial charging took place before unplugging
+                self.cycle_active_seconds = 0.0
+                self.cycle_start_percent = percentage
+                self.battery_history = [{"time": now, "active_seconds": 0.0, "percent": percentage}]
+                self.settings.setValue("battery_history", json.dumps(self.battery_history))
+                self.settings.setValue("cycle_active_seconds", 0.0)
+                self.settings.setValue("cycle_start_percent", percentage)
+            self.charge_start_percent = None
+
+        # Accumulate active discharge time (filtering out sleep/suspend gaps > 5 mins)
+        if 0 < poll_gap <= max_normal_gap:
+            self.cycle_active_seconds += poll_gap
+            self.settings.setValue("cycle_active_seconds", self.cycle_active_seconds)
+
         # If history is empty, initialize it
         if not self.battery_history:
-            self.battery_history = [{"time": now, "percent": percentage}]
-            self.settings.setValue("battery_history", json.dumps(self.battery_history))
-            return
-            
-        last_point = self.battery_history[-1]
-        
-        # If charged to threshold or more, or if battery percentage increased, reset history
-        charged_thresh = getattr(self, "charged_threshold", 95)
-        if percentage >= charged_thresh and (last_point.get("percent", 0) < charged_thresh or any(p.get("percent", 0) < charged_thresh for p in self.battery_history)):
-            self.battery_history = [{"time": now, "percent": percentage}]
+            self.battery_history = [{"time": now, "active_seconds": self.cycle_active_seconds, "percent": percentage}]
             self.settings.setValue("battery_history", json.dumps(self.battery_history))
             return
 
-        if percentage > last_point.get("percent", 0):
-            self.battery_history = [{"time": now, "percent": percentage}]
+        last_point = self.battery_history[-1]
+        charged_thresh = getattr(self, "charged_threshold", 95)
+
+        # Full charge threshold reset
+        if percentage >= charged_thresh and (last_point.get("percent", 0) < charged_thresh or any(p.get("percent", 0) < charged_thresh for p in self.battery_history)):
+            self.cycle_active_seconds = 0.0
+            self.cycle_start_percent = percentage
+            self.battery_history = [{"time": now, "active_seconds": 0.0, "percent": percentage}]
             self.settings.setValue("battery_history", json.dumps(self.battery_history))
+            self.settings.setValue("cycle_active_seconds", 0.0)
+            self.settings.setValue("cycle_start_percent", percentage)
             return
-            
-        # If the percentage dropped, log it
+
+        # If battery percentage increased by >= 3% while unplugged (e.g. battery swap or recalibration)
+        if percentage >= last_point.get("percent", 0) + 3:
+            self.cycle_active_seconds = 0.0
+            self.cycle_start_percent = percentage
+            self.battery_history = [{"time": now, "active_seconds": 0.0, "percent": percentage}]
+            self.settings.setValue("battery_history", json.dumps(self.battery_history))
+            self.settings.setValue("cycle_active_seconds", 0.0)
+            self.settings.setValue("cycle_start_percent", percentage)
+            return
+
+        # If percentage dropped, record the drop point with active_seconds
         if percentage < last_point.get("percent", 0):
-            self.battery_history.append({"time": now, "percent": percentage})
-            if len(self.battery_history) > 10:
+            entry = {
+                "time": now,
+                "active_seconds": self.cycle_active_seconds,
+                "percent": percentage
+            }
+            self.battery_history.append(entry)
+            if len(self.battery_history) > 15:
                 self.battery_history.pop(0)
             self.settings.setValue("battery_history", json.dumps(self.battery_history))
 
@@ -878,35 +932,70 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
     def estimate_hours_left(self, current_percentage):
         if self.is_charging:
             return ""
-            
-        if not self.battery_history or len(self.battery_history) < 2:
-            # Default fallback: ~120 hours total life (0.83% drop per hour)
-            default_rate = 0.83
-            hours = current_percentage / default_rate
-            time_str = self.format_duration(hours * 3600)
-            return f" (~{time_str} left est.)"
-            
-        first = self.battery_history[0]
-        last = self.battery_history[-1]
+
+        macro_rate = None
+        micro_rate = None
         
-        pct_drop = first["percent"] - last["percent"]
-        time_elapsed = last["time"] - first["time"]
+        # 1. Macro rate from cycle start (e.g. from 95% down to current percentage)
+        cycle_start = getattr(self, "cycle_start_percent", 100)
+        cycle_active_sec = getattr(self, "cycle_active_seconds", 0.0)
+        cycle_drop = cycle_start - current_percentage
         
-        if pct_drop <= 0 or time_elapsed < 60:
-            default_rate = 0.83
-            hours = current_percentage / default_rate
-            time_str = self.format_duration(hours * 3600)
-            return f" (~{time_str} left est.)"
+        if cycle_drop >= 2 and cycle_active_sec >= 900:  # at least 2% drop and 15 mins active
+            hours_cycle = cycle_active_sec / 3600.0
+            rate = cycle_drop / hours_cycle
+            if 0.25 <= rate <= 5.0:
+                macro_rate = rate
+
+        # 2. Weighted micro rate across intervals in battery_history
+        if len(self.battery_history) >= 2:
+            interval_rates = []
+            interval_weights = []
             
-        hours_elapsed = time_elapsed / 3600.0
-        drain_rate = pct_drop / hours_elapsed
-        
-        if drain_rate < 0.2:
-            drain_rate = 0.2
-        elif drain_rate > 10.0:
-            drain_rate = 10.0
-            
-        hours = current_percentage / drain_rate
+            for i in range(1, len(self.battery_history)):
+                p_prev = self.battery_history[i - 1].get("percent", 0)
+                p_curr = self.battery_history[i].get("percent", 0)
+                
+                a_prev = self.battery_history[i - 1].get("active_seconds", None)
+                a_curr = self.battery_history[i].get("active_seconds", None)
+                
+                if a_prev is not None and a_curr is not None:
+                    delta_sec = a_curr - a_prev
+                else:
+                    # Fallback for older entries without active_seconds
+                    delta_sec = self.battery_history[i].get("time", 0) - self.battery_history[i - 1].get("time", 0)
+                    if delta_sec > 300:
+                        delta_sec = 300
+                
+                delta_pct = p_prev - p_curr
+                if delta_pct > 0 and delta_sec >= 60:
+                    r = delta_pct / (delta_sec / 3600.0)
+                    if 0.25 <= r <= 5.0:
+                        interval_rates.append(r)
+                        interval_weights.append(i)  # more recent intervals have higher weight
+                        
+            if interval_rates:
+                micro_rate = sum(r * w for r, w in zip(interval_rates, interval_weights)) / sum(interval_weights)
+
+        # 3. Blend rates or fall back to learned rate
+        if macro_rate is not None and micro_rate is not None:
+            effective_rate = 0.5 * macro_rate + 0.5 * micro_rate
+        elif micro_rate is not None:
+            effective_rate = micro_rate
+        elif macro_rate is not None:
+            effective_rate = macro_rate
+        else:
+            effective_rate = getattr(self, "learned_drain_rate", 0.83)
+
+        # Clamp rate within practical hardware limits (0.25% to 5.0% / hour)
+        effective_rate = max(0.25, min(5.0, effective_rate))
+
+        # Update learned drain rate with light exponential smoothing (10% new rate, 90% prior)
+        current_learned = getattr(self, "learned_drain_rate", 0.83)
+        self.learned_drain_rate = 0.9 * current_learned + 0.1 * effective_rate
+        self.settings.setValue("learned_drain_rate", self.learned_drain_rate)
+
+        hours = current_percentage / effective_rate
         time_str = self.format_duration(hours * 3600)
         return f" (~{time_str} left est.)"
 
