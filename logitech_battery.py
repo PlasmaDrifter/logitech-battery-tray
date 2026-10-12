@@ -402,7 +402,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                 pass
         super().__init__(argv)
         self.setApplicationName("zzz_logitech_battery")
-        self.setApplicationDisplayName("zzz_logitech_battery")
+        self.setApplicationDisplayName("Logitech Battery")
         self.setDesktopFileName("logitech-battery-tray")
         self.setWindowIcon(QtGui.QIcon.fromTheme("logitech-battery-tray", QtGui.QIcon.fromTheme("input-mouse")))
         self.setQuitOnLastWindowClosed(False)
