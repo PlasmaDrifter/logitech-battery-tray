@@ -42,6 +42,54 @@ else:
     QtAlignHCenter = QtCore.Qt.AlignmentFlag.AlignHCenter
     QtAlignVCenter = QtCore.Qt.AlignmentFlag.AlignVCenter
 
+CE_MenuItem = getattr(QtWidgets.QStyle.ControlElement, 'CE_MenuItem', getattr(QtWidgets.QStyle, 'CE_MenuItem', 14))
+CT_MenuItem = getattr(QtWidgets.QStyle.ContentsType, 'CT_MenuItem', getattr(QtWidgets.QStyle, 'CT_MenuItem', 3))
+PM_SmallIconSize = getattr(QtWidgets.QStyle.PixelMetric, 'PM_SmallIconSize', getattr(QtWidgets.QStyle, 'PM_SmallIconSize', 13))
+PM_MenuHMargin = getattr(QtWidgets.QStyle.PixelMetric, 'PM_MenuHMargin', getattr(QtWidgets.QStyle, 'PM_MenuHMargin', 4))
+State_Selected = getattr(QtWidgets.QStyle.StateFlag, 'State_Selected', getattr(QtWidgets.QStyle, 'State_Selected', 1))
+
+class RichMenuStyle(QtWidgets.QProxyStyle):
+    def sizeFromContents(self, ct, opt, size, widget=None):
+        sz = super().sizeFromContents(ct, opt, size, widget)
+        if ct == CT_MenuItem and opt and hasattr(opt, 'text') and opt.text.startswith('<html>'):
+            doc = QtGui.QTextDocument()
+            doc.setDefaultFont(opt.font)
+            doc.setHtml(opt.text)
+            extra_w = int(doc.idealWidth()) - opt.fontMetrics.horizontalAdvance(opt.text)
+            if extra_w > 0:
+                sz.setWidth(sz.width() + extra_w)
+        return sz
+
+    def drawControl(self, element, opt, painter, widget=None):
+        if element == CE_MenuItem and opt.text.startswith('<html>'):
+            raw_html = opt.text
+            copy_opt = QtWidgets.QStyleOptionMenuItem(opt)
+            copy_opt.text = ''
+            super().drawControl(element, copy_opt, painter, widget)
+            
+            doc = QtGui.QTextDocument()
+            doc.setDefaultFont(opt.font)
+            
+            is_selected = bool(opt.state & State_Selected)
+            text_color = opt.palette.color(QtGui.QPalette.ColorGroup.Active, QtGui.QPalette.ColorRole.HighlightedText if is_selected else QtGui.QPalette.ColorRole.WindowText).name()
+            doc.setDefaultStyleSheet(f'* {{ color: {text_color}; }}')
+            doc.setHtml(raw_html)
+            
+            icon_size = self.pixelMetric(PM_SmallIconSize, opt, widget)
+            if icon_size <= 0:
+                icon_size = 16
+            h_margin = self.pixelMetric(PM_MenuHMargin, opt, widget)
+            spacing = 8
+            text_x = opt.rect.x() + h_margin + icon_size + spacing
+            text_y = opt.rect.y() + (opt.rect.height() - doc.size().height()) / 2
+            
+            painter.save()
+            painter.translate(text_x, text_y)
+            doc.drawContents(painter)
+            painter.restore()
+            return
+        super().drawControl(element, opt, painter, widget)
+
 
 # 2. Worker Thread for Hardware Read (prevents main GUI thread blocking/freezing)
 class QueryWorker(QtCore.QThread):
@@ -364,11 +412,12 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Load programmatic style (0=solid, 1=segmented, 2=minimalist, 3=capsule)
         self.programmatic_style = self.settings.value("programmatic_style", 0, type=int)
 
-        # Set Breeze or Fusion style for consistent widget drawing
+        # Set Breeze or Fusion style with RichMenuStyle proxy
         if "Breeze" in QtWidgets.QStyleFactory.keys():
-            self.setStyle(QtWidgets.QStyleFactory.create("Breeze"))
+            base_style = QtWidgets.QStyleFactory.create("Breeze")
         else:
-            self.setStyle(QtWidgets.QStyleFactory.create("Fusion"))
+            base_style = QtWidgets.QStyleFactory.create("Fusion")
+        self.setStyle(RichMenuStyle(base_style))
 
 
         # State variables
@@ -414,34 +463,20 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
 
     def get_battery_status_icon(self, percentage, is_charging):
         if is_charging:
-            # Charging color: vibrant green
-            color_name = "green"
-            filename = f"battery-charging-{color_name}.svg"
+            filename = "battery-charging-green.svg"
         else:
-            # Discharging color based on battery thresholds or theme
-            crit = getattr(self, "critical_threshold", 14)
-            warn = getattr(self, "warning_threshold", 20)
-            if percentage <= crit:
-                color_name = "red"
-            elif percentage <= warn:
-                color_name = "orange"
-            elif hasattr(self, "colored_theme") and hasattr(self, "theme_colors") and self.colored_theme > 0 and self.colored_theme < len(self.theme_colors):
-                color_name = self.theme_colors[self.colored_theme]
-            else:
-                color_name = "green"
-
             if percentage >= 80:
-                filename = f"battery-full-{color_name}.svg"
+                filename = "battery-full-green.svg"
             elif percentage >= 40:
-                filename = f"battery-half-{color_name}.svg"
+                filename = "battery-half-green.svg"
             elif percentage >= 15:
-                filename = f"battery-low-{color_name}.svg"
+                filename = "battery-low-green.svg"
             else:
-                filename = f"battery-empty-{color_name}.svg"
+                filename = "battery-empty-green.svg"
 
-        # Render vertical icon (is_horizontal=False)
+        # Render vertical icon with pure white color (#FFFFFF)
         try:
-            return self.load_svg_icon(filename, False, False)
+            return self.load_svg_icon(filename, False, False, color_override="#FFFFFF")
         except Exception:
             svg_path = os.path.join(self.script_dir, "icons", filename)
             if os.path.exists(svg_path):
@@ -500,8 +535,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.time_left_action.setIcon(QtGui.QIcon.fromTheme("preferences-system-time", QtGui.QIcon.fromTheme("clock")))
         self.menu.addAction(self.time_left_action)
         
-        self.state_action = QActionClass("Discharging", self.menu)
+        self.state_action = QActionClass("Charging", self.menu)
         self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
+        self.state_action.setVisible(False)
         self.menu.addAction(self.state_action)
         
         self.time_on_battery_action = QActionClass("Runtime: Unknown", self.menu)
@@ -631,8 +667,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             if hasattr(self, 'time_left_action'):
                 self.time_left_action.setVisible(False)
             if hasattr(self, 'state_action'):
-                self.state_action.setText("Disconnected")
-                self.state_action.setIcon(QtGui.QIcon.fromTheme("dialog-warning", QtGui.QIcon.fromTheme("network-offline")))
+                self.state_action.setVisible(False)
             if hasattr(self, 'time_on_battery_action'):
                 if self.has_valid_data and self.last_charged_time > 0.0:
                     elapsed = time.time() - self.last_charged_time
@@ -660,7 +695,11 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         estimate = self.estimate_hours_left(percentage)
         bar = self.make_battery_bar(percentage)
         
-        status_text = f"{self.battery_percentage}% [{bar}]"
+        if is_charging:
+            charge_col = getattr(self, "color_charging", "#2ECC71")
+            status_text = f"<html>{self.battery_percentage}% <span style='color: {charge_col}; font-weight: bold;'>[{bar}]</span></html>"
+        else:
+            status_text = f"{self.battery_percentage}% [{bar}]"
             
         self.header_action.setText(self.device_name or "Logitech Device")
         self.status_action.setText(status_text)
@@ -681,9 +720,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             if self.is_charging:
                 self.state_action.setText("Charging")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
+                self.state_action.setVisible(True)
             else:
-                self.state_action.setText("Discharging")
-                self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-good", QtGui.QIcon.fromTheme("weather-storm")))
+                self.state_action.setVisible(False)
         
         # Calculate and format elapsed time on battery
         if self.last_charged_time > 0.0:
@@ -771,7 +810,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             default_rate = 0.83
             hours = current_percentage / default_rate
             time_str = self.format_duration(hours * 3600)
-            return f" (~{time_str} left)"
+            return f" (~{time_str} left est.)"
             
         first = self.battery_history[0]
         last = self.battery_history[-1]
@@ -783,7 +822,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             default_rate = 0.83
             hours = current_percentage / default_rate
             time_str = self.format_duration(hours * 3600)
-            return f" (~{time_str} left)"
+            return f" (~{time_str} left est.)"
             
         hours_elapsed = time_elapsed / 3600.0
         drain_rate = pct_drop / hours_elapsed
@@ -795,7 +834,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         hours = current_percentage / drain_rate
         time_str = self.format_duration(hours * 3600)
-        return f" (~{time_str} left)"
+        return f" (~{time_str} left est.)"
 
     def update_icon(self):
         if self.icon_style == 1:
@@ -1050,7 +1089,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         painter.end()
         return QtGui.QIcon(pixmap)
 
-    def load_svg_icon(self, filename, show_text, is_horizontal):
+    def load_svg_icon(self, filename, show_text, is_horizontal, color_override=None):
         svg_path = os.path.join(self.script_dir, "icons", filename)
         size = 32
         pixmap = QtGui.QPixmap(size, size)
@@ -1065,7 +1104,17 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                 from PyQt6 import QtSvg
                 
         painter = QtGui.QPainter(pixmap)
-        renderer = QtSvg.QSvgRenderer(svg_path)
+        if color_override:
+            try:
+                with open(svg_path, 'r', encoding='utf-8') as f:
+                    svg_data = f.read()
+                import re
+                recolored = re.sub(r'fill="[^"]*"', f'fill="{color_override}"', svg_data)
+                renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(recolored.encode('utf-8')))
+            except Exception:
+                renderer = QtSvg.QSvgRenderer(svg_path)
+        else:
+            renderer = QtSvg.QSvgRenderer(svg_path)
         
         # Apply visual zoom scaling around center
         zoom_scale = getattr(self, "icon_scale", 100) / 100.0
