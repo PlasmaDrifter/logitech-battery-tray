@@ -410,38 +410,43 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         clamped = max(0, min(100, int(percentage)))
         filled = int(round((clamped / 100.0) * width))
         empty = width - filled
-        return "█" * filled + "░" * empty
+        return "━" * filled + "─" * empty
 
     def get_battery_status_icon(self, percentage, is_charging):
-        color_name = "blue"
-        if hasattr(self, "colored_theme") and hasattr(self, "theme_colors"):
-            if self.colored_theme > 0 and self.colored_theme < len(self.theme_colors):
-                color_name = self.theme_colors[self.colored_theme]
-            elif self.colored_theme == 0:
-                crit = getattr(self, "critical_threshold", 14)
-                warn = getattr(self, "warning_threshold", 20)
-                if percentage <= crit:
-                    color_name = "red"
-                elif percentage <= warn:
-                    color_name = "orange"
-                else:
-                    color_name = "green"
-
         if is_charging:
+            # Charging color: vibrant green
+            color_name = "green"
             filename = f"battery-charging-{color_name}.svg"
-        elif percentage >= 80:
-            filename = f"battery-full-{color_name}.svg"
-        elif percentage >= 40:
-            filename = f"battery-half-{color_name}.svg"
-        elif percentage >= 15:
-            filename = f"battery-low-{color_name}.svg"
         else:
-            filename = f"battery-empty-{color_name}.svg"
+            # Discharging color based on battery thresholds or theme
+            crit = getattr(self, "critical_threshold", 14)
+            warn = getattr(self, "warning_threshold", 20)
+            if percentage <= crit:
+                color_name = "red"
+            elif percentage <= warn:
+                color_name = "orange"
+            elif hasattr(self, "colored_theme") and hasattr(self, "theme_colors") and self.colored_theme > 0 and self.colored_theme < len(self.theme_colors):
+                color_name = self.theme_colors[self.colored_theme]
+            else:
+                color_name = "green"
 
-        svg_path = os.path.join(self.script_dir, "icons", filename)
-        if os.path.exists(svg_path):
-            return QtGui.QIcon(svg_path)
-        return QtGui.QIcon.fromTheme("battery-charging" if is_charging else ("battery-good" if percentage >= 50 else "battery-low"))
+            if percentage >= 80:
+                filename = f"battery-full-{color_name}.svg"
+            elif percentage >= 40:
+                filename = f"battery-half-{color_name}.svg"
+            elif percentage >= 15:
+                filename = f"battery-low-{color_name}.svg"
+            else:
+                filename = f"battery-empty-{color_name}.svg"
+
+        # Render vertical icon (is_horizontal=False)
+        try:
+            return self.load_svg_icon(filename, False, False)
+        except Exception:
+            svg_path = os.path.join(self.script_dir, "icons", filename)
+            if os.path.exists(svg_path):
+                return QtGui.QIcon(svg_path)
+            return QtGui.QIcon.fromTheme("battery-charging" if is_charging else ("battery-good" if percentage >= 50 else "battery-low"))
 
     def get_checkbox_icon(self, checked):
         name = "checkbox-checked" if checked else "checkbox"
@@ -494,6 +499,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.state_action = QActionClass("State: Discharging", self.menu)
         self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
         self.menu.addAction(self.state_action)
+        
+        self.time_on_battery_action = QActionClass("On Battery: Unknown", self.menu)
+        self.time_on_battery_action.setIcon(QtGui.QIcon.fromTheme("document-open-recent", QtGui.QIcon.fromTheme("preferences-system-time")))
+        self.menu.addAction(self.time_on_battery_action)
         
         self.menu.addSeparator()
         
@@ -618,6 +627,13 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             if hasattr(self, 'state_action'):
                 self.state_action.setText("State: Disconnected")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("dialog-warning", QtGui.QIcon.fromTheme("network-offline")))
+            if hasattr(self, 'time_on_battery_action'):
+                if self.has_valid_data and self.last_charged_time > 0.0:
+                    elapsed = time.time() - self.last_charged_time
+                    time_str = self.format_duration(elapsed)
+                    self.time_on_battery_action.setText(f"On Battery: {time_str}")
+                else:
+                    self.time_on_battery_action.setText("On Battery: Unknown")
             self.tray_icon.setToolTip(f"Logitech Battery Monitor\n{self.error_details}")
             
         self.update_icon()
@@ -652,13 +668,22 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                 self.state_action.setText("State: Discharging")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-good", QtGui.QIcon.fromTheme("weather-storm")))
         
-        # Calculate and format elapsed time since charged
+        # Calculate and format elapsed time on battery
         if self.last_charged_time > 0.0:
             elapsed = time.time() - self.last_charged_time
             time_str = self.format_duration(elapsed)
+            if self.is_charging:
+                on_batt_text = f"On Charger: {time_str}"
+            else:
+                on_batt_text = f"On Battery: {time_str}"
             charged_text = f"Charged to 95+%: {time_str} ago"
         else:
+            on_batt_text = "On Battery: Unknown"
             charged_text = "Charged to 95+%: Unknown"
+            
+        if hasattr(self, 'time_on_battery_action'):
+            self.time_on_battery_action.setText(on_batt_text)
+            self.time_on_battery_action.setIcon(QtGui.QIcon.fromTheme("document-open-recent", QtGui.QIcon.fromTheme("preferences-system-time")))
             
         self.tray_icon.setToolTip(f"{self.device_name}\nCharge: {self.battery_percentage}%{estimate}\n{charged_text}")
         
