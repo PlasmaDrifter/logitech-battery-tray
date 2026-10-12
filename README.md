@@ -26,7 +26,7 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 ## Features
 
 - **Direct HID Probing**: Queries battery percentages and charging states directly from Logitech USB wireless receivers via HID++ protocols.
-- **Hours-Remaining Estimator**: Tracks historical discharge rates over time and calculates a moving average to display estimated remaining battery life (`~72h left`).
+- **Smart Hours-Remaining Estimator**: Tracks active discharge intervals using weighted moving averages and macro-cycle blending while filtering out system sleep/suspend gaps, displaying realistic remaining battery estimates (`~72h left`).
 - **Last Charge Timestamp Tracking**: Records the exact moment the battery was charged to or above the configured Full Charge Threshold (default 95%), persisting the time elapsed (`Runtime: 2d 6h`) across system reboots.
 - **6 Programmatic Vector Styles**:
   - **Solid Continuous**: Standard continuous level fill bar.
