@@ -258,40 +258,6 @@ class SettingsDialog(QtWidgets.QDialog):
         
         layout.addLayout(form)
         
-        # 95% Charge Threshold Tip Box
-        tip_frame = QtWidgets.QFrame()
-        tip_frame.setObjectName("tipFrame")
-        tip_frame.setStyleSheet("""
-            QFrame#tipFrame {
-                background-color: rgba(52, 152, 219, 0.08);
-                border: 1px solid rgba(52, 152, 219, 0.30);
-                border-radius: 6px;
-            }
-        """)
-        tip_layout = QtWidgets.QHBoxLayout(tip_frame)
-        tip_layout.setContentsMargins(10, 8, 10, 8)
-        tip_layout.setSpacing(10)
-
-        tip_icon = QtWidgets.QLabel()
-        tip_icon.setPixmap(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")).pixmap(20, 20))
-        tip_icon.setAlignment(QtAlignTop)
-        tip_icon.setFixedSize(20, 20)
-        tip_layout.addWidget(tip_icon)
-
-        tip_text = QtWidgets.QLabel(
-            "<b>Tip: 95% Charge Threshold</b><br>"
-            "• <b>No need to wait for 100%:</b> Logitech wireless mice often charge rapidly up to ~90–95%, "
-            "then slow down into trickle charging to protect Li-ion battery health (or hover around 95–98%). "
-            "Setting the threshold at 95% means you don't have to wait for it to top off to 100% before unplugging.<br>"
-            "• <b>Runtime timer resets:</b> As long as the battery reaches 95% or higher, runtime begins tracking from that moment.<br>"
-            "• <b>Drain rate estimator resets:</b> Discharge history and remaining time estimate (~Xh left est.) reset at 95% for a fresh cycle."
-        )
-        tip_text.setWordWrap(True)
-        tip_text.setStyleSheet("font-size: 8.5pt;")
-        tip_layout.addWidget(tip_text, 1)
-
-        layout.addWidget(tip_frame)
-        
         if QtVariant == "PyQt5":
             OkButton = QtWidgets.QDialogButtonBox.Ok
             CancelButton = QtWidgets.QDialogButtonBox.Cancel
@@ -302,10 +268,39 @@ class SettingsDialog(QtWidgets.QDialog):
         buttons = QtWidgets.QDialogButtonBox(OkButton | CancelButton)
         buttons.accepted.connect(self.save_settings)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        
+        # Bottom row with Tip icon button on the left and OK/Cancel on the right
+        bottom_layout = QtWidgets.QHBoxLayout()
+        tip_btn = QtWidgets.QToolButton()
+        tip_btn.setIcon(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")))
+        tip_btn.setToolTip("Click to view 95% Charge Threshold Tip")
+        tip_btn.setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 4px; padding: 4px; } QToolButton:hover { background: #3d3d3d; }")
+        tip_btn.clicked.connect(self.show_tip_popup)
+        bottom_layout.addWidget(tip_btn)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(buttons)
+        
+        layout.addLayout(bottom_layout)
         
         self.validate_thresholds()
         self.update_theme_combo_state()
+
+    def show_tip_popup(self):
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle("95% Charge Threshold Tip")
+        if QtVariant == "PyQt5":
+            msg.setIcon(QtWidgets.QMessageBox.Information)
+        else:
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        msg.setText("<b>Tip: 95% Charge Threshold</b>")
+        msg.setInformativeText(
+            "• <b>No need to wait for 100%:</b> Logitech wireless mice often charge rapidly up to ~90–95%, "
+            "then slow down into trickle charging to protect Li-ion battery health (or hover around 95–98%). "
+            "Setting the threshold at 95% means you don't have to wait for it to top off to 100% before unplugging.\n\n"
+            "• <b>Runtime timer resets:</b> As long as the battery reaches 95% or higher, runtime begins tracking from that moment.\n\n"
+            "• <b>Drain rate estimator resets:</b> Discharge history and remaining time estimate (~Xh left est.) reset at 95% for a fresh cycle."
+        )
+        msg.exec()
         
     def update_theme_combo_state(self):
         is_svg = (self.source_combo.currentIndex() == 1)
