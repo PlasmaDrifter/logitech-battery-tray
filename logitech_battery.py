@@ -38,9 +38,11 @@ except ImportError:
 if QtVariant == "PyQt5":
     QtAlignHCenter = QtCore.Qt.AlignHCenter
     QtAlignVCenter = QtCore.Qt.AlignVCenter
+    QtAlignTop = QtCore.Qt.AlignTop
 else:
     QtAlignHCenter = QtCore.Qt.AlignmentFlag.AlignHCenter
     QtAlignVCenter = QtCore.Qt.AlignmentFlag.AlignVCenter
+    QtAlignTop = QtCore.Qt.AlignmentFlag.AlignTop
 
 CE_MenuItem = getattr(QtWidgets.QStyle.ControlElement, 'CE_MenuItem', getattr(QtWidgets.QStyle, 'CE_MenuItem', 14))
 CT_MenuItem = getattr(QtWidgets.QStyle.ContentsType, 'CT_MenuItem', getattr(QtWidgets.QStyle, 'CT_MenuItem', 3))
@@ -255,6 +257,40 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("", self.autostart_check)
         
         layout.addLayout(form)
+        
+        # 95% Charge Threshold Tip Box
+        tip_frame = QtWidgets.QFrame()
+        tip_frame.setObjectName("tipFrame")
+        tip_frame.setStyleSheet("""
+            QFrame#tipFrame {
+                background-color: rgba(52, 152, 219, 0.08);
+                border: 1px solid rgba(52, 152, 219, 0.30);
+                border-radius: 6px;
+            }
+        """)
+        tip_layout = QtWidgets.QHBoxLayout(tip_frame)
+        tip_layout.setContentsMargins(10, 8, 10, 8)
+        tip_layout.setSpacing(10)
+
+        tip_icon = QtWidgets.QLabel()
+        tip_icon.setPixmap(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")).pixmap(20, 20))
+        tip_icon.setAlignment(QtAlignTop)
+        tip_icon.setFixedSize(20, 20)
+        tip_layout.addWidget(tip_icon)
+
+        tip_text = QtWidgets.QLabel(
+            "<b>Tip: 95% Charge Threshold</b><br>"
+            "• <b>No need to wait for 100%:</b> Logitech wireless mice often charge rapidly up to ~90–95%, "
+            "then slow down into trickle charging to protect Li-ion battery health (or hover around 95–98%). "
+            "Setting the threshold at 95% means you don't have to wait for it to top off to 100% before unplugging.<br>"
+            "• <b>Runtime timer resets:</b> As long as the battery reaches 95% or higher, runtime begins tracking from that moment.<br>"
+            "• <b>Drain rate estimator resets:</b> Discharge history and remaining time estimate (~Xh left est.) reset at 95% for a fresh cycle."
+        )
+        tip_text.setWordWrap(True)
+        tip_text.setStyleSheet("font-size: 8.5pt;")
+        tip_layout.addWidget(tip_text, 1)
+
+        layout.addWidget(tip_frame)
         
         if QtVariant == "PyQt5":
             OkButton = QtWidgets.QDialogButtonBox.Ok
