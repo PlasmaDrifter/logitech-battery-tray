@@ -298,14 +298,28 @@ class SettingsDialog(QtWidgets.QDialog):
             msg.setIcon(QtWidgets.QMessageBox.Information)
         else:
             msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
-        msg.setText("<b>Tip: Full Charge Threshold</b>")
-        msg.setInformativeText(
-            "• <b>No need to wait for 100%:</b> Logitech wireless mice often charge rapidly up to ~90–95%, "
-            "then slow down into trickle charging to protect Li-ion battery health (or hover around 95–98%). "
-            "Setting this threshold means you don't have to wait for it to top off to 100% before unplugging.\n\n"
-            "• <b>Runtime timer resets:</b> As long as the battery reaches this threshold or higher, runtime begins tracking from that moment.\n\n"
-            "• <b>Drain rate estimator resets:</b> Discharge history and remaining time estimate (~Xh left est.) reset at this threshold for a fresh cycle."
-        )
+        html = """
+<div style="min-width: 450px; font-size: 10pt; line-height: 1.45;">
+  <h3 style="margin-top: 0; margin-bottom: 10px;">Full Charge Threshold</h3>
+
+  <p style="margin-top: 0; margin-bottom: 12px;">
+    <b>&bull; No need to wait for 100%</b><br>
+    Logitech wireless mice often charge rapidly up to ~90–95%, then slow down into trickle charging to protect Li-ion battery health (or hover around 95–98%). Setting this threshold lets you unplug early without missing a full-cycle reset.
+  </p>
+
+  <p style="margin-top: 0; margin-bottom: 12px;">
+    <b>&bull; Runtime timer resets</b><br>
+    As soon as the battery reaches this threshold or higher, the <i>Runtime</i> tracker automatically resets and begins tracking elapsed time from that moment.
+  </p>
+
+  <p style="margin-top: 0; margin-bottom: 4px;">
+    <b>&bull; Drain rate estimator resets</b><br>
+    Discharge history and the remaining hours estimate (<i>~Xh left est.</i>) reset at this percentage so calculations start fresh for the new discharge cycle.
+  </p>
+</div>
+"""
+        msg.setText(html)
+        msg.setInformativeText("")
         msg.exec()
         
     def update_theme_combo_state(self):
