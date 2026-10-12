@@ -25,21 +25,21 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 
 ## Features
 
-- **Direct HID Probing**: Queries battery percentages and charging states directly from Logitech USB wireless receivers via HID++ protocols.
-- **Smart Hours-Remaining Estimator**: Tracks active discharge intervals using weighted moving averages and macro-cycle blending while filtering out system sleep/suspend gaps, displaying realistic remaining battery estimates (`~72h left`).
-- **Last Charge Timestamp Tracking**: Records the exact moment the battery was charged to or above the configured Full Charge Threshold (default 95%), persisting the time elapsed (`Runtime: 2d 6h`) across system reboots.
+- **Direct HID Probing**
+- **Hours-Remaining Estimator**
+- **Last Charge Timestamp Tracking**
 - **6 Programmatic Vector Styles**:
-  - **Solid Continuous**: Standard continuous level fill bar.
-  - **Segmented (3 Blocks)**: Renders low, medium, and high charge levels inside three distinct visual segment slots.
-  - **Minimalist Outline**: Thin container border outline with a tighter spacing fill bar.
-  - **Rounded Capsule**: Smooth modern pill capsule shapes for both container and fill bars.
-  - **Rainbow Gradient**: Linear color gradient fading from Red to Orange to Green based on charge levels.
-  - **Circular Ring Gauge**: Smartwatch-inspired 360-degree progress arc dial.
-- **60 Included Colored SVG Theme Icons**: Choose between dynamic state-based colors or 12 fixed color palettes (Amber, Blue, Cyan, Green, Indigo, Lime, Orange, Pink, Purple, Red, Teal, Yellow).
-- **Vertical & Horizontal Layouts**: Support for both vertical and horizontal tray orientations with automatic $90^\circ$ vector rotation and upright text overlays.
-- **Real-Time Live Previews**: Changes in the Preferences dialog update the system tray icon instantly in real-time.
-- **Native KDE Breeze Theme**: Inherits system dark/light palettes automatically.
-- **Autostart Support**: Single-click configuration to launch automatically on system boot.
+  - **Solid Continuous**
+  - **Segmented (3 Blocks)**
+  - **Minimalist Outline**
+  - **Rounded Capsule**
+  - **Rainbow Gradient**
+  - **Circular Ring Gauge**
+- **60 Included Colored SVG Theme Icons**
+- **Vertical & Horizontal Layouts**
+- **Real-Time Live Previews**
+- **Native KDE Breeze Theme**
+- **Autostart Support**
 
 ---
 
