@@ -234,7 +234,17 @@ class SettingsDialog(QtWidgets.QDialog):
         form.addRow("Warning Level Color:", self.btn_color_warning)
         form.addRow("Critical Level Color:", self.btn_color_critical)
         form.addRow("Charging State Color:", self.btn_color_charging)
-        form.addRow("Empty Track Color:", self.btn_color_empty)
+        
+        empty_track_layout = QtWidgets.QHBoxLayout()
+        empty_track_layout.addWidget(self.btn_color_empty)
+        lbl_empty_note = QtWidgets.QLabel("(Circular Ring Gauge only)")
+        lbl_empty_note.setStyleSheet("color: #777777; font-size: 8.5pt;")
+        empty_track_layout.addWidget(lbl_empty_note)
+        empty_track_layout.addStretch()
+        self.btn_color_empty.setToolTip("Applies only to the Circular Ring Gauge icon style")
+        self.track_opacity_slider.setToolTip("Applies only to the Circular Ring Gauge icon style")
+        
+        form.addRow("Empty Track Color:", empty_track_layout)
         form.addRow("Empty Track Opacity:", self.track_opacity_slider)
         form.addRow("Icon Direction Style:", self.layout_combo)
         form.addRow("Icon Source Set:", self.source_combo)
