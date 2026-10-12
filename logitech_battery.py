@@ -745,10 +745,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                 on_batt_text = f"On Charger: {time_str}"
             else:
                 on_batt_text = f"Runtime: {time_str}"
-            charged_text = f"Charged to 95+%: {time_str} ago"
+            charged_text = on_batt_text
         else:
             on_batt_text = "Runtime: Unknown"
-            charged_text = "Charged to 95+%: Unknown"
+            charged_text = "Runtime: Unknown"
             
         if hasattr(self, 'time_on_battery_action'):
             self.time_on_battery_action.setText(on_batt_text)
