@@ -27,7 +27,7 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 
 - **Direct HID Probing**: Queries battery percentages and charging states directly from Logitech USB wireless receivers via HID++ protocols.
 - **Hours-Remaining Estimator**: Tracks historical discharge rates over time and calculates a moving average to display estimated remaining battery life (`~72h left`).
-- **Last Charge Timestamp Tracking**: Records the exact moment the battery was charged to $\ge 95\%$, persisting the time elapsed (`Charged to 95+%: 2d 6h ago`) across system reboots.
+- **Last Charge Timestamp Tracking**: Records the exact moment the battery was charged to or above the configured Full Charge Threshold (default 95%), persisting the time elapsed (`Runtime: 2d 6h`) across system reboots.
 - **6 Programmatic Vector Styles**:
   - **Solid Continuous**: Standard continuous level fill bar.
   - **Segmented (3 Blocks)**: Renders low, medium, and high charge levels inside three distinct visual segment slots.
@@ -134,7 +134,7 @@ Launch the application using any of the following methods:
 ### System Tray Right-Click Menu
 - **Logitech Device**: Device model name.
 - **Battery Status**: Current percentage, remaining hours estimate, and charging state.
-- **Charged to 95+%**: Elapsed time since the battery was last fully charged.
+- **Runtime**: Elapsed time since the battery was last charged to the full charge threshold.
 - **Refresh Now**: Force an immediate battery query.
 - **Refresh Interval**: Select polling interval (5s, 10s, 30s, 60s).
 - **Start on Boot**: Enable/disable autostart entry in `~/.config/autostart`.

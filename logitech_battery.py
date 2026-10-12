@@ -132,13 +132,19 @@ class SettingsDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
         form = QtWidgets.QFormLayout()
         
+        self.charged_spin = QtWidgets.QSpinBox()
+        self.charged_spin.setRange(80, 100)
+        self.charged_spin.setValue(getattr(self.app, "charged_threshold", 95))
+        self.charged_spin.setSuffix(" %")
+        self.charged_spin.valueChanged.connect(self.validate_thresholds)
+        
         self.warning_spin = QtWidgets.QSpinBox()
-        self.warning_spin.setRange(2, 100)
+        self.warning_spin.setRange(2, 99)
         self.warning_spin.setValue(self.app.warning_threshold)
         self.warning_spin.setSuffix(" %")
         
         self.critical_spin = QtWidgets.QSpinBox()
-        self.critical_spin.setRange(1, 99)
+        self.critical_spin.setRange(1, 98)
         self.critical_spin.setValue(self.app.critical_threshold)
         self.critical_spin.setSuffix(" %")
         
@@ -229,18 +235,19 @@ class SettingsDialog(QtWidgets.QDialog):
         self.track_opacity_slider.setTickInterval(10)
         self.track_opacity_slider.valueChanged.connect(self.apply_settings)
 
-        warning_layout = QtWidgets.QHBoxLayout()
-        warning_layout.addWidget(self.warning_spin)
+        charged_layout = QtWidgets.QHBoxLayout()
+        charged_layout.addWidget(self.charged_spin)
         
         self.tip_btn = QtWidgets.QToolButton()
         self.tip_btn.setIcon(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")))
-        self.tip_btn.setToolTip("Click to view 95% Charge Threshold Tip")
+        self.tip_btn.setToolTip("Click to view Full Charge Threshold Tip")
         self.tip_btn.setStyleSheet("QToolButton { border: 1px solid #555; border-radius: 4px; padding: 2px; } QToolButton:hover { background: #3d3d3d; }")
         self.tip_btn.clicked.connect(self.show_tip_popup)
-        warning_layout.addWidget(self.tip_btn)
-        warning_layout.addStretch()
+        charged_layout.addWidget(self.tip_btn)
+        charged_layout.addStretch()
 
-        form.addRow("Warning (Orange) Threshold:", warning_layout)
+        form.addRow("Full Charge Threshold:", charged_layout)
+        form.addRow("Warning (Orange) Threshold:", self.warning_spin)
         form.addRow("Critical (Red) Threshold:", self.critical_spin)
         form.addRow("Tray Icon Visual Zoom:", self.icon_scale_spin)
         form.addRow("Normal Level Color:", self.btn_color_normal)
@@ -286,18 +293,18 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def show_tip_popup(self):
         msg = QtWidgets.QMessageBox(self)
-        msg.setWindowTitle("95% Charge Threshold Tip")
+        msg.setWindowTitle("Full Charge Threshold Tip")
         if QtVariant == "PyQt5":
             msg.setIcon(QtWidgets.QMessageBox.Information)
         else:
             msg.setIcon(QtWidgets.QMessageBox.Icon.Information)
-        msg.setText("<b>Tip: 95% Charge Threshold</b>")
+        msg.setText("<b>Tip: Full Charge Threshold</b>")
         msg.setInformativeText(
             "• <b>No need to wait for 100%:</b> Logitech wireless mice often charge rapidly up to ~90–95%, "
             "then slow down into trickle charging to protect Li-ion battery health (or hover around 95–98%). "
-            "Setting the threshold at 95% means you don't have to wait for it to top off to 100% before unplugging.\n\n"
-            "• <b>Runtime timer resets:</b> As long as the battery reaches 95% or higher, runtime begins tracking from that moment.\n\n"
-            "• <b>Drain rate estimator resets:</b> Discharge history and remaining time estimate (~Xh left est.) reset at 95% for a fresh cycle."
+            "Setting this threshold means you don't have to wait for it to top off to 100% before unplugging.\n\n"
+            "• <b>Runtime timer resets:</b> As long as the battery reaches this threshold or higher, runtime begins tracking from that moment.\n\n"
+            "• <b>Drain rate estimator resets:</b> Discharge history and remaining time estimate (~Xh left est.) reset at this threshold for a fresh cycle."
         )
         msg.exec()
         
@@ -327,12 +334,17 @@ class SettingsDialog(QtWidgets.QDialog):
             self.apply_settings()
 
     def validate_thresholds(self):
+        charged_val = self.charged_spin.value()
         warn_val = self.warning_spin.value()
         crit_val = self.critical_spin.value()
+        if warn_val >= charged_val:
+            self.warning_spin.setValue(charged_val - 1)
+            warn_val = charged_val - 1
         if crit_val >= warn_val:
-            self.warning_spin.setValue(crit_val + 1)
+            self.critical_spin.setValue(warn_val - 1)
  
     def apply_settings(self):
+        charged_val = self.charged_spin.value()
         warn_val = self.warning_spin.value()
         crit_val = self.critical_spin.value()
         horiz_layout = (self.layout_combo.currentIndex() == 1)
@@ -347,6 +359,7 @@ class SettingsDialog(QtWidgets.QDialog):
         show_txt = self.text_check.isChecked()
         autostart = self.autostart_check.isChecked()
         
+        self.app.charged_threshold = charged_val
         self.app.warning_threshold = warn_val
         self.app.critical_threshold = crit_val
         self.app.icon_style = icon_sty
@@ -364,6 +377,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.color_empty = self.color_empty_val
         self.app.track_opacity = self.track_opacity_slider.value()
         
+        self.app.settings.setValue("charged_threshold", charged_val)
         self.app.settings.setValue("warning_threshold", warn_val)
         self.app.settings.setValue("critical_threshold", crit_val)
         self.app.settings.setValue("icon_style", icon_sty)
@@ -429,6 +443,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.show_text = self.settings.value("show_text", False, type=bool)
         self.poll_interval = self.settings.value("poll_interval", 10, type=int)
         self.autostart_enabled = self.settings.value("autostart", False, type=bool)
+        self.charged_threshold = self.settings.value("charged_threshold", 95, type=int)
         self.warning_threshold = self.settings.value("warning_threshold", 20, type=int)
         self.critical_threshold = self.settings.value("critical_threshold", 14, type=int)
         self.icon_scale = self.settings.value("icon_scale", 100, type=int)
@@ -730,7 +745,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.is_charging = is_charging
         
         # Update charge timestamp if conditions met
-        if percentage >= 95 or (is_charging and percentage >= 95):
+        charged_thresh = getattr(self, "charged_threshold", 95)
+        if percentage >= charged_thresh or (is_charging and percentage >= charged_thresh):
             self.last_charged_time = time.time()
             self.settings.setValue("last_charged_time", self.last_charged_time)
             
@@ -809,8 +825,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         last_point = self.battery_history[-1]
         
-        # If charged to 95% or more, or if battery percentage increased, reset history
-        if percentage >= 95 and (last_point.get("percent", 0) < 95 or any(p.get("percent", 0) < 95 for p in self.battery_history)):
+        # If charged to threshold or more, or if battery percentage increased, reset history
+        charged_thresh = getattr(self, "charged_threshold", 95)
+        if percentage >= charged_thresh and (last_point.get("percent", 0) < charged_thresh or any(p.get("percent", 0) < charged_thresh for p in self.battery_history)):
             self.battery_history = [{"time": now, "percent": percentage}]
             self.settings.setValue("battery_history", json.dumps(self.battery_history))
             return
