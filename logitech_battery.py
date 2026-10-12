@@ -410,7 +410,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         clamped = max(0, min(100, int(percentage)))
         filled = int(round((clamped / 100.0) * width))
         empty = width - filled
-        return "━" * filled + "─" * empty
+        return "■" * filled + "□" * empty
 
     def get_battery_status_icon(self, percentage, is_charging):
         if is_charging:
@@ -495,6 +495,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.status_action = QActionClass("Querying state...", self.menu)
         self.status_action.setIcon(self.get_battery_status_icon(0, False))
         self.menu.addAction(self.status_action)
+        
+        self.time_left_action = QActionClass("Calculating time left...", self.menu)
+        self.time_left_action.setIcon(QtGui.QIcon.fromTheme("preferences-system-time", QtGui.QIcon.fromTheme("clock")))
+        self.menu.addAction(self.time_left_action)
         
         self.state_action = QActionClass("State: Discharging", self.menu)
         self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
@@ -624,6 +628,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             bar = self.make_battery_bar(last_seen_pct)
             self.status_action.setText(f"Not Connected (Last: {last_seen_pct}%) [{bar}]" if self.has_valid_data else "Not Connected")
             self.status_action.setIcon(self.get_battery_status_icon(last_seen_pct, False))
+            if hasattr(self, 'time_left_action'):
+                self.time_left_action.setVisible(False)
             if hasattr(self, 'state_action'):
                 self.state_action.setText("State: Disconnected")
                 self.state_action.setIcon(QtGui.QIcon.fromTheme("dialog-warning", QtGui.QIcon.fromTheme("network-offline")))
@@ -654,11 +660,22 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         estimate = self.estimate_hours_left(percentage)
         bar = self.make_battery_bar(percentage)
         
-        status_text = f"{self.battery_percentage}% [{bar}]{estimate}"
+        status_text = f"{self.battery_percentage}% [{bar}]"
             
         self.header_action.setText(self.device_name or "Logitech Device")
         self.status_action.setText(status_text)
         self.status_action.setIcon(self.get_battery_status_icon(percentage, is_charging))
+        
+        clean_estimate = estimate.strip().strip("()")
+        if hasattr(self, 'time_left_action'):
+            if clean_estimate and not self.is_charging:
+                self.time_left_action.setText(clean_estimate)
+                self.time_left_action.setVisible(True)
+            elif self.is_charging:
+                self.time_left_action.setVisible(False)
+            else:
+                self.time_left_action.setText("Estimating time left...")
+                self.time_left_action.setVisible(True)
         
         if hasattr(self, 'state_action'):
             if self.is_charging:
