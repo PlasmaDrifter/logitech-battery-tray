@@ -4,7 +4,11 @@ import sys
 import json
 import time
 import subprocess
-import setproctitle
+try:
+    import setproctitle
+except ImportError:
+    setproctitle = None
+
 
 __version__ = "1.1.1"
 
@@ -303,15 +307,16 @@ class SettingsDialog(QtWidgets.QDialog):
 # 4. Main Tray Application Class
 class LogitechBatteryTrayApp(QtWidgets.QApplication):
     def __init__(self, argv):
-        try:
-            setproctitle.setproctitle("Logitech Battery")
-        except Exception:
-            pass
+        if setproctitle is not None:
+            try:
+                setproctitle.setproctitle("Logitech Battery")
+            except Exception:
+                pass
         super().__init__(argv)
         self.setApplicationName("zzz_logitech_battery")
         self.setApplicationDisplayName("zzz_logitech_battery")
         self.setDesktopFileName("logitech-battery-tray")
-        self.setWindowIcon(QtGui.QIcon.fromTheme("input-mouse"))
+        self.setWindowIcon(QtGui.QIcon.fromTheme("logitech-battery-tray", QtGui.QIcon.fromTheme("input-mouse")))
         self.setQuitOnLastWindowClosed(False)
         
         # Paths setup
@@ -1004,9 +1009,9 @@ Version=1.0
 Name=Logitech Battery
 Comment=Logitech Battery Monitor System Tray Application
 Exec=python3 "{os.path.abspath(__file__)}"
-Icon=input-mouse
+Icon=logitech-battery-tray
 Terminal=false
-Categories=Utility;System;
+Categories=Utility;Qt;
 StartupNotify=false
 """
             try:

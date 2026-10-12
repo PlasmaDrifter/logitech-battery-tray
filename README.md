@@ -46,25 +46,53 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 ## Requirements & Dependencies
 
 - **Python**: 3.8 or higher
-- **GUI Framework**: `PySide6` (or `PyQt5` / `PyQt6`)
+- **GUI Framework**: `PySide6` (or `PyQt6` / `PyQt5`)
+- **Process Utility**: `setproctitle` (optional)
 - **System Permissions**: Read/Write access to `/dev/hidraw*` device nodes (configured via udev rule).
 
 ---
 
 ## Installation
 
-### 1. Clone Repository
+### Automated Installation (Recommended)
+
+Clone the repository and run the installer:
+
 ```bash
-git clone https://github.com/your-username/logitech-battery-tray.git
+git clone https://github.com/PlasmaDrifter/logitech-battery-tray.git
 cd logitech-battery-tray
+chmod +x install.sh
+./install.sh
 ```
 
-### 2. Install Python Dependencies
+#### Installer Options
+- **Enable Autostart on Boot**:
+  ```bash
+  ./install.sh --autostart
+  ```
+- **Install Logitech HID++ udev Rules (requires sudo)**:
+  ```bash
+  ./install.sh --udev
+  ```
+
+#### What `install.sh` Does
+1. Verifies Python 3 (>= 3.8) and installs any missing Python packages via pip if necessary.
+2. Installs application files to `~/.local/share/logitech-battery-tray/`.
+3. Creates a command-line launcher at `~/.local/bin/logitech-battery-tray`.
+4. Installs the vector application icon to `~/.local/share/icons/hicolor/scalable/apps/logitech-battery-tray.svg`.
+5. Installs the desktop application launcher to `~/.local/share/applications/logitech-battery-tray.desktop`.
+6. Checks for Logitech USB receiver udev permissions and refreshes system icon and desktop databases.
+
+---
+
+### Manual Installation (Alternative)
+
+#### 1. Install Python Dependencies
 ```bash
-pip install PySide6 hidapi
+pip install -r requirements.txt
 ```
 
-### 3. Setup USB udev Permissions (Linux)
+#### 2. Setup USB udev Permissions (Linux)
 To allow querying Logitech receiver devices without running as root, add your user to the `input` or `plugdev` group and install a udev rule:
 
 ```bash
@@ -78,12 +106,30 @@ sudo udevadm trigger
 
 ---
 
+## Uninstallation
+
+To remove the application, CLI launcher, desktop entries, and icons:
+
+```bash
+chmod +x uninstall.sh
+./uninstall.sh
+```
+
+To also delete saved user configurations (`~/.config/logitech-battery-tray`):
+
+```bash
+./uninstall.sh --purge
+```
+
+---
+
 ## Usage
 
-Run the tray application directly from terminal:
-```bash
-python3 logitech_battery.py
-```
+Launch the application using any of the following methods:
+
+- **Application Menu**: Search for **Logitech Battery** in your desktop environment's launcher (KDE Plasma, GNOME, etc.).
+- **Command Line**: Run `logitech-battery-tray` from any terminal.
+- **Direct Script**: Run `python3 logitech_battery.py` from the project directory.
 
 ### System Tray Right-Click Menu
 - **Logitech Device**: Device model name.
@@ -109,9 +155,10 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-## 💬 Community & Discussions
+## Community & Discussions
 
 Got questions, setup ideas, or feedback?
 
-* 🌐 Join our subreddit at [**r/PlasmaDrifterProjects**](https://reddit.com/r/PlasmaDrifterProjects) to discuss updates, get support, and share configurations.
+* Join our subreddit at [**r/PlasmaDrifterProjects**](https://reddit.com/r/PlasmaDrifterProjects) to discuss updates, get support, and share configurations.
 * Contact directly via email at [**plasmadrifter121@gmail.com**](mailto:plasmadrifter121@gmail.com).
+
