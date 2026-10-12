@@ -406,6 +406,43 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Trigger initial query
         self.start_query()
 
+    def make_battery_bar(self, percentage, width=10):
+        clamped = max(0, min(100, int(percentage)))
+        filled = int(round((clamped / 100.0) * width))
+        empty = width - filled
+        return "█" * filled + "░" * empty
+
+    def get_battery_status_icon(self, percentage, is_charging):
+        color_name = "blue"
+        if hasattr(self, "colored_theme") and hasattr(self, "theme_colors"):
+            if self.colored_theme > 0 and self.colored_theme < len(self.theme_colors):
+                color_name = self.theme_colors[self.colored_theme]
+            elif self.colored_theme == 0:
+                crit = getattr(self, "critical_threshold", 14)
+                warn = getattr(self, "warning_threshold", 20)
+                if percentage <= crit:
+                    color_name = "red"
+                elif percentage <= warn:
+                    color_name = "orange"
+                else:
+                    color_name = "green"
+
+        if is_charging:
+            filename = f"battery-charging-{color_name}.svg"
+        elif percentage >= 80:
+            filename = f"battery-full-{color_name}.svg"
+        elif percentage >= 40:
+            filename = f"battery-half-{color_name}.svg"
+        elif percentage >= 15:
+            filename = f"battery-low-{color_name}.svg"
+        else:
+            filename = f"battery-empty-{color_name}.svg"
+
+        svg_path = os.path.join(self.script_dir, "icons", filename)
+        if os.path.exists(svg_path):
+            return QtGui.QIcon(svg_path)
+        return QtGui.QIcon.fromTheme("battery-charging" if is_charging else ("battery-good" if percentage >= 50 else "battery-low"))
+
     def init_tray(self):
         # Create System Tray Icon
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
@@ -414,27 +451,40 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Construct Context Menu
         self.menu = QtWidgets.QMenu()
         
-        # 1. Info Header Section (Rendered as standard actions for D-Bus compatibility and bright text)
+        # 1. Device Status Section
+        self.menu.addSection("DEVICE STATUS")
+        
         self.header_action = QActionClass("Logitech Device", self.menu)
+        self.header_action.setIcon(QtGui.QIcon.fromTheme("input-mouse"))
         self.menu.addAction(self.header_action)
         
-        self.status_action = QActionClass("Querying state...", self.menu)
+        self.status_action = QActionClass("Battery: Querying state...", self.menu)
+        self.status_action.setIcon(self.get_battery_status_icon(0, False))
         self.menu.addAction(self.status_action)
         
+        self.state_action = QActionClass("State: Discharging", self.menu)
+        self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
+        self.menu.addAction(self.state_action)
+        
         self.charged_time_action = QActionClass("Charged to 95+%: Unknown", self.menu)
+        self.charged_time_action.setIcon(QtGui.QIcon.fromTheme("document-open-recent", QtGui.QIcon.fromTheme("clock")))
         self.menu.addAction(self.charged_time_action)
         
         self.menu.addSeparator()
         
         # 2. Refresh Action
         self.refresh_action = QActionClass("Refresh Now", self.menu)
+        self.refresh_action.setIcon(QtGui.QIcon.fromTheme("view-refresh"))
         self.refresh_action.triggered.connect(self.start_query)
         self.menu.addAction(self.refresh_action)
         
         self.menu.addSeparator()
         
-        # 3. Settings Submenu - Refresh Interval
-        self.interval_menu = self.menu.addMenu("Refresh Interval")
+        # 3. Controls Section
+        self.menu.addSection("CONTROLS")
+        
+        self.interval_menu = self.menu.addMenu("Polling Interval")
+        self.interval_menu.setIcon(QtGui.QIcon.fromTheme("appointment-recurring", QtGui.QIcon.fromTheme("preferences-system-time")))
         self.interval_group = QtGui.QActionGroup(self.interval_menu)
         
         intervals = [5, 10, 30, 60]
@@ -452,15 +502,18 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.action_autostart.setChecked(self.autostart_enabled)
         self.action_autostart.triggered.connect(self.toggle_autostart)
         self.menu.addAction(self.action_autostart)
+        
         # 5. Preferences settings panel launcher
         self.prefs_action = QActionClass("Preferences...", self.menu)
+        self.prefs_action.setIcon(QtGui.QIcon.fromTheme("preferences-system", QtGui.QIcon.fromTheme("configure")))
         self.prefs_action.triggered.connect(self.show_preferences)
         self.menu.addAction(self.prefs_action)
         
         self.menu.addSeparator()
         
-        # 7. Quit Action
+        # 6. Quit Action
         self.quit_action = QActionClass("Quit Monitor", self.menu)
+        self.quit_action.setIcon(QtGui.QIcon.fromTheme("application-exit"))
         self.quit_action.triggered.connect(self.quit)
         self.menu.addAction(self.quit_action)
         
@@ -534,7 +587,13 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             self.is_charging = False
             
             self.header_action.setText("Logitech Device")
-            self.status_action.setText(f"Not Connected (Last seen: {self.battery_percentage}%)" if self.has_valid_data else "Not Connected")
+            last_seen_pct = self.battery_percentage if self.has_valid_data else 0
+            bar = self.make_battery_bar(last_seen_pct)
+            self.status_action.setText(f"Not Connected (Last: {last_seen_pct}%) [{bar}]" if self.has_valid_data else "Not Connected")
+            self.status_action.setIcon(self.get_battery_status_icon(last_seen_pct, False))
+            if hasattr(self, 'state_action'):
+                self.state_action.setText("State: Disconnected")
+                self.state_action.setIcon(QtGui.QIcon.fromTheme("dialog-warning", QtGui.QIcon.fromTheme("network-offline")))
             self.tray_icon.setToolTip(f"Logitech Battery Monitor\n{self.error_details}")
             
         self.update_icon()
@@ -553,15 +612,21 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         self.update_battery_history(percentage, is_charging)
         estimate = self.estimate_hours_left(percentage)
+        bar = self.make_battery_bar(percentage)
         
-        status_text = f"Battery: {self.battery_percentage}%{estimate}"
-        if self.is_charging:
-            status_text += " (Charging)"
-        else:
-            status_text += " (Discharging)"
+        status_text = f"Battery: {self.battery_percentage}% [{bar}]{estimate}"
             
         self.header_action.setText(self.device_name)
         self.status_action.setText(status_text)
+        self.status_action.setIcon(self.get_battery_status_icon(percentage, is_charging))
+        
+        if hasattr(self, 'state_action'):
+            if self.is_charging:
+                self.state_action.setText("State: Charging")
+                self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
+            else:
+                self.state_action.setText("State: Discharging")
+                self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-good", QtGui.QIcon.fromTheme("weather-storm")))
         
         # Calculate and format elapsed time since charged
         if self.last_charged_time > 0.0:
@@ -988,6 +1053,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                     act.setChecked(True)
                 else:
                     act.setChecked(False)
+        if hasattr(self, 'status_action'):
+            self.status_action.setIcon(self.get_battery_status_icon(self.battery_percentage, self.is_charging))
 
     def set_interval(self, seconds):
         self.poll_interval = seconds
