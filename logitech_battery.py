@@ -375,7 +375,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.battery_percentage = 0
         self.is_charging = False
         self.query_success = False
-        self.device_name = ""
+        self.device_name = "Logitech Device"
         self.error_details = "Initializing..."
         
         # Debounce filter state
@@ -443,6 +443,35 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             return QtGui.QIcon(svg_path)
         return QtGui.QIcon.fromTheme("battery-charging" if is_charging else ("battery-good" if percentage >= 50 else "battery-low"))
 
+    def get_checkbox_icon(self, checked):
+        name = "checkbox-checked" if checked else "checkbox"
+        icon = QtGui.QIcon.fromTheme(name)
+        if not icon.isNull():
+            return icon
+        # Fallback drawn icon
+        pix = QtGui.QPixmap(24, 24)
+        pix.fill(QtCore.Qt.transparent)
+        p = QtGui.QPainter(pix)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        rect = QtCore.QRectF(3, 3, 18, 18)
+        if checked:
+            p.setBrush(QtGui.QBrush(QtGui.QColor("#2ecc71")))
+            p.setPen(QtCore.Qt.NoPen)
+            p.drawRoundedRect(rect, 4, 4)
+            pen = QtGui.QPen(QtGui.QColor("#ffffff"), 2.2)
+            pen.setCapStyle(QtCore.Qt.RoundCap)
+            pen.setJoinStyle(QtCore.Qt.RoundJoin)
+            p.setPen(pen)
+            p.drawLine(QtCore.QPointF(7, 12), QtCore.QPointF(10.5, 15.5))
+            p.drawLine(QtCore.QPointF(10.5, 15.5), QtCore.QPointF(17, 8.5))
+        else:
+            pen = QtGui.QPen(QtGui.QColor("#888888"), 1.8)
+            p.setPen(pen)
+            p.setBrush(QtCore.Qt.NoBrush)
+            p.drawRoundedRect(rect, 4, 4)
+        p.end()
+        return QtGui.QIcon(pix)
+
     def init_tray(self):
         # Create System Tray Icon
         self.tray_icon = QtWidgets.QSystemTrayIcon(self)
@@ -458,17 +487,13 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.header_action.setIcon(QtGui.QIcon.fromTheme("input-mouse"))
         self.menu.addAction(self.header_action)
         
-        self.status_action = QActionClass("Battery: Querying state...", self.menu)
+        self.status_action = QActionClass("Querying state...", self.menu)
         self.status_action.setIcon(self.get_battery_status_icon(0, False))
         self.menu.addAction(self.status_action)
         
         self.state_action = QActionClass("State: Discharging", self.menu)
         self.state_action.setIcon(QtGui.QIcon.fromTheme("battery-charging", QtGui.QIcon.fromTheme("weather-storm")))
         self.menu.addAction(self.state_action)
-        
-        self.charged_time_action = QActionClass("Charged to 95+%: Unknown", self.menu)
-        self.charged_time_action.setIcon(QtGui.QIcon.fromTheme("document-open-recent", QtGui.QIcon.fromTheme("clock")))
-        self.menu.addAction(self.charged_time_action)
         
         self.menu.addSeparator()
         
@@ -498,9 +523,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         # 4. Autostart checkbox
         self.action_autostart = QActionClass("Start on Boot", self.menu)
-        self.action_autostart.setCheckable(True)
-        self.action_autostart.setChecked(self.autostart_enabled)
-        self.action_autostart.triggered.connect(self.toggle_autostart)
+        self.action_autostart.setIcon(self.get_checkbox_icon(self.autostart_enabled))
+        self.action_autostart.triggered.connect(lambda: self.toggle_autostart(not self.autostart_enabled))
         self.menu.addAction(self.action_autostart)
         
         # 5. Preferences settings panel launcher
@@ -614,9 +638,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         estimate = self.estimate_hours_left(percentage)
         bar = self.make_battery_bar(percentage)
         
-        status_text = f"Battery: {self.battery_percentage}% [{bar}]{estimate}"
+        status_text = f"{self.battery_percentage}% [{bar}]{estimate}"
             
-        self.header_action.setText(self.device_name)
+        self.header_action.setText(self.device_name or "Logitech Device")
         self.status_action.setText(status_text)
         self.status_action.setIcon(self.get_battery_status_icon(percentage, is_charging))
         
@@ -636,7 +660,6 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         else:
             charged_text = "Charged to 95+%: Unknown"
             
-        self.charged_time_action.setText(charged_text)
         self.tray_icon.setToolTip(f"{self.device_name}\nCharge: {self.battery_percentage}%{estimate}\n{charged_text}")
         
         # Save historical values
@@ -1043,9 +1066,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         return QtGui.QIcon(pixmap)
 
     def sync_menu_states(self):
-        # Update autostart checkbox in tray menu
+        # Update autostart icon in tray menu
         if hasattr(self, 'action_autostart'):
-            self.action_autostart.setChecked(self.autostart_enabled)
+            self.action_autostart.setIcon(self.get_checkbox_icon(self.autostart_enabled))
         # Update refresh interval checkmarks in tray menu
         if hasattr(self, 'interval_menu'):
             for act in self.interval_menu.actions():
@@ -1065,6 +1088,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
     def toggle_autostart(self, checked):
         self.autostart_enabled = checked
         self.settings.setValue("autostart", checked)
+        if hasattr(self, 'action_autostart'):
+            self.action_autostart.setIcon(self.get_checkbox_icon(checked))
         autostart_dir = os.path.expanduser("~/.config/autostart")
         desktop_file = os.path.join(autostart_dir, "logitech-battery-tray.desktop")
         
