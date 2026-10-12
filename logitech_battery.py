@@ -10,7 +10,7 @@ except ImportError:
     setproctitle = None
 
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 # 1. Dynamic Qt Bindings Discovery & Compatibility layer
 try:
