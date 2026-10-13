@@ -778,11 +778,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         estimate = self.estimate_hours_left(percentage)
         bar = self.make_battery_bar(percentage)
         
-        if is_charging:
-            charge_col = getattr(self, "color_charging", "#2ECC71")
-            status_text = f"<html>{self.battery_percentage}% <span style='color: {charge_col}; font-weight: bold;'>[{bar}]</span></html>"
-        else:
-            status_text = f"{self.battery_percentage}% [{bar}]"
+        status_text = f"{self.battery_percentage}% [{bar}]"
             
         self.header_action.setText(self.device_name or "Logitech Device")
         self.status_action.setText(status_text)
