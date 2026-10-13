@@ -551,20 +551,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         else:
             color_hex = getattr(self, "color_normal", "#E0E0E0")
 
-        # Use the programmatic battery vector bar matching the user's selected style & condition color
-        if getattr(self, "icon_style", 0) == 0:
-            try:
-                return self.draw_battery_icon(
-                    percentage=percentage,
-                    is_charging=is_charging,
-                    is_horizontal=True,
-                    show_text=False,
-                    battery_color_hex=color_hex
-                )
-            except Exception:
-                pass
-
-        # Or fallback to SVG icon recolored in the condition color
+        # Select corresponding SVG icon level
         if is_charging:
             filename = "battery-charging-green.svg"
         elif percentage <= crit_thresh:
@@ -578,6 +565,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         else:
             filename = "battery-low-green.svg"
 
+        # Always render vertical (is_horizontal=False) with condition color
         try:
             return self.load_svg_icon(filename, False, False, color_override=color_hex)
         except Exception:
