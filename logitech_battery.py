@@ -766,7 +766,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         
         # Update charge timestamp and full cycle state if conditions met
         charged_thresh = getattr(self, "charged_threshold", 95)
-        if percentage >= charged_thresh or (is_charging and percentage >= charged_thresh):
+        if (is_charging and percentage >= charged_thresh) or (self.last_charged_time == 0.0 and percentage >= charged_thresh):
             self.last_charged_time = time.time()
             self.settings.setValue("last_charged_time", self.last_charged_time)
             self.cycle_active_seconds = 0.0
@@ -856,8 +856,11 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
 
         # If user just unplugged:
         if self.charge_start_percent is not None:
-            if percentage >= (self.charge_start_percent + 3):
+            charged_thresh = getattr(self, "charged_threshold", 95)
+            if percentage >= charged_thresh or percentage >= (self.charge_start_percent + 3):
                 # Substantial charging took place before unplugging
+                self.last_charged_time = now
+                self.settings.setValue("last_charged_time", self.last_charged_time)
                 self.cycle_active_seconds = 0.0
                 self.cycle_start_percent = percentage
                 self.battery_history = [{"time": now, "active_seconds": 0.0, "percent": percentage}]
@@ -882,6 +885,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
 
         # Full charge threshold reset
         if percentage >= charged_thresh and (last_point.get("percent", 0) < charged_thresh or any(p.get("percent", 0) < charged_thresh for p in self.battery_history)):
+            self.last_charged_time = now
+            self.settings.setValue("last_charged_time", self.last_charged_time)
             self.cycle_active_seconds = 0.0
             self.cycle_start_percent = percentage
             self.battery_history = [{"time": now, "active_seconds": 0.0, "percent": percentage}]
