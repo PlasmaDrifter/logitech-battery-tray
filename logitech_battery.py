@@ -530,11 +530,25 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         # Trigger initial query
         self.start_query()
 
-    def make_battery_bar(self, percentage, width=10):
+    def make_battery_bar(self, percentage, is_charging=False, width=10):
         clamped = max(0, min(100, int(percentage)))
         filled = int(round((clamped / 100.0) * width))
         empty = width - filled
-        return "■" * filled + "□" * empty
+        
+        crit_thresh = getattr(self, "critical_threshold", 14)
+        warn_thresh = getattr(self, "warning_threshold", 20)
+        
+        if is_charging:
+            fill_char = "🟩"
+        elif clamped <= crit_thresh:
+            fill_char = "🟥"
+        elif clamped <= warn_thresh:
+            fill_char = "🟧"
+        else:
+            fill_char = "🟩"
+            
+        empty_char = "⬛"
+        return fill_char * filled + empty_char * empty
 
     def get_battery_status_icon(self, percentage, is_charging):
         crit_thresh = getattr(self, "critical_threshold", 14)
@@ -792,7 +806,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         self.update_battery_history(percentage, is_charging)
         estimate = self.estimate_hours_left(percentage)
-        bar = self.make_battery_bar(percentage)
+        bar = self.make_battery_bar(percentage, is_charging=is_charging)
         
         status_text = f"{self.battery_percentage}% [{bar}]"
             
