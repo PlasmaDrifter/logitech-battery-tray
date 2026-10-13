@@ -537,21 +537,49 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         return "■" * filled + "□" * empty
 
     def get_battery_status_icon(self, percentage, is_charging):
+        crit_thresh = getattr(self, "critical_threshold", 14)
+        warn_thresh = getattr(self, "warning_threshold", 20)
+
+        if not getattr(self, "has_valid_data", False) and percentage == 0:
+            color_hex = "#7F8C8D"
+        elif is_charging:
+            color_hex = getattr(self, "color_charging", "#2ECC71")
+        elif percentage <= crit_thresh:
+            color_hex = getattr(self, "color_critical", "#FF6B6B")
+        elif percentage <= warn_thresh:
+            color_hex = getattr(self, "color_warning", "#F39C12")
+        else:
+            color_hex = getattr(self, "color_normal", "#E0E0E0")
+
+        # Use the programmatic battery vector bar matching the user's selected style & condition color
+        if getattr(self, "icon_style", 0) == 0:
+            try:
+                return self.draw_battery_icon(
+                    percentage=percentage,
+                    is_charging=is_charging,
+                    is_horizontal=True,
+                    show_text=False,
+                    battery_color_hex=color_hex
+                )
+            except Exception:
+                pass
+
+        # Or fallback to SVG icon recolored in the condition color
         if is_charging:
             filename = "battery-charging-green.svg"
+        elif percentage <= crit_thresh:
+            filename = "battery-empty-green.svg"
+        elif percentage <= warn_thresh:
+            filename = "battery-low-green.svg"
+        elif percentage >= 80:
+            filename = "battery-full-green.svg"
+        elif percentage >= 40:
+            filename = "battery-half-green.svg"
         else:
-            if percentage >= 80:
-                filename = "battery-full-green.svg"
-            elif percentage >= 40:
-                filename = "battery-half-green.svg"
-            elif percentage >= 15:
-                filename = "battery-low-green.svg"
-            else:
-                filename = "battery-empty-green.svg"
+            filename = "battery-low-green.svg"
 
-        # Render vertical icon with pure white color (#FFFFFF)
         try:
-            return self.load_svg_icon(filename, False, False, color_override="#FFFFFF")
+            return self.load_svg_icon(filename, False, False, color_override=color_hex)
         except Exception:
             svg_path = os.path.join(self.script_dir, "icons", filename)
             if os.path.exists(svg_path):
