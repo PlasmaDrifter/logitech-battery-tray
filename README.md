@@ -15,6 +15,9 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 ### Settings & Preferences
 ![Preferences Window](assets/preferences_preview.png)
 
+### System Tray Menu & Battery States
+![Tray Menu States](assets/tray_menu_all_states.png)
+
 ### Programmatic Battery Layout Styles
 ![Programmatic Styles Gallery](assets/preview_styles.png)
 

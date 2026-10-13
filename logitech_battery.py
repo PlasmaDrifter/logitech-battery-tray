@@ -579,7 +579,10 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
 
     def make_battery_bar(self, percentage, is_charging=False, width=10):
         clamped = max(0, min(100, int(percentage)))
-        filled = int(round((clamped / 100.0) * width))
+        if clamped > 0:
+            filled = max(1, int(round((clamped / 100.0) * width)))
+        else:
+            filled = 0
         empty = width - filled
         
         crit_thresh = getattr(self, "critical_threshold", 14)
