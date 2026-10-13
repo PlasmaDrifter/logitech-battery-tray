@@ -136,17 +136,20 @@ class SettingsDialog(QtWidgets.QDialog):
         self.charged_spin.setRange(80, 100)
         self.charged_spin.setValue(getattr(self.app, "charged_threshold", 95))
         self.charged_spin.setSuffix(" %")
+        self.charged_spin.setFixedWidth(72)
         self.charged_spin.valueChanged.connect(self.validate_thresholds)
         
         self.warning_spin = QtWidgets.QSpinBox()
         self.warning_spin.setRange(2, 99)
         self.warning_spin.setValue(self.app.warning_threshold)
         self.warning_spin.setSuffix(" %")
+        self.warning_spin.setFixedWidth(72)
         
         self.critical_spin = QtWidgets.QSpinBox()
         self.critical_spin.setRange(1, 98)
         self.critical_spin.setValue(self.app.critical_threshold)
         self.critical_spin.setSuffix(" %")
+        self.critical_spin.setFixedWidth(72)
         
         self.warning_spin.valueChanged.connect(self.validate_thresholds)
         self.critical_spin.valueChanged.connect(self.validate_thresholds)
@@ -226,6 +229,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.icon_scale_spin.setValue(self.app.icon_scale)
         self.icon_scale_spin.setSuffix(" %")
         self.icon_scale_spin.setSingleStep(5)
+        self.icon_scale_spin.setFixedWidth(85)
         self.icon_scale_spin.valueChanged.connect(self.apply_settings)
 
         self.track_opacity_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
