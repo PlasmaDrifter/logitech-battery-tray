@@ -1344,22 +1344,17 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.settings.setValue("autostart", checked)
         if hasattr(self, 'action_autostart'):
             self.action_autostart.setIcon(self.get_checkbox_icon(checked))
-        autostart_dir = os.path.expanduser("~/.config/autostart")
+        autostart_dir = os.path.join(QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.StandardLocation.ConfigLocation), "autostart")
         desktop_file = os.path.join(autostart_dir, "logitech-battery-tray.desktop")
         
         if checked:
             os.makedirs(autostart_dir, exist_ok=True)
-            launcher_path = os.path.expanduser("~/.local/bin/logitech-battery-tray")
-            if os.path.exists(launcher_path):
-                exec_cmd = launcher_path
-            else:
-                exec_cmd = f'python3 "{os.path.abspath(__file__)}"'
-            content = f"""[Desktop Entry]
+            content = """[Desktop Entry]
 Type=Application
 Version=1.0
 Name=Logitech Battery
 Comment=Logitech wireless mouse and device battery monitor tray application
-Exec={exec_cmd}
+Exec=logitech-battery-tray
 Icon=logitech-battery-tray
 Terminal=false
 Categories=Utility;Qt;
@@ -1380,5 +1375,14 @@ StartupNotify=false
 
 
 if __name__ == '__main__':
+    lock_path = os.path.join(QtCore.QStandardPaths.writableLocation(QtCore.QStandardPaths.StandardLocation.TempLocation), "logitech-battery-tray.lock")
+    lock_file = QtCore.QLockFile(lock_path)
+    if not lock_file.tryLock(100):
+        print("Logitech Battery Tray is already running. Exiting.", file=sys.stderr)
+        sys.exit(0)
+
     app = LogitechBatteryTrayApp(sys.argv)
-    sys.exit(app.exec())
+    exit_func = getattr(app, 'exec', getattr(app, 'exec_', None))
+    exit_code = exit_func() if exit_func else 0
+    lock_file.unlock()
+    sys.exit(exit_code)
