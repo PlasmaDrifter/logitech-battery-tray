@@ -545,7 +545,7 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         elif clamped <= warn_thresh:
             fill_char = "🟧"
         else:
-            fill_char = "🟩"
+            fill_char = "⬜"
             
         empty_char = "⬛"
         return fill_char * filled + empty_char * empty
