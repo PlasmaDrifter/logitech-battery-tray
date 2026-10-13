@@ -235,8 +235,24 @@ class SettingsDialog(QtWidgets.QDialog):
         self.track_opacity_slider.setTickInterval(10)
         self.track_opacity_slider.valueChanged.connect(self.apply_settings)
 
+        self.notify_charged_check = QtWidgets.QCheckBox("Notify")
+        self.notify_charged_check.setToolTip("Show notification when battery reaches full charge threshold")
+        self.notify_charged_check.setChecked(getattr(self.app, "notify_charged", True))
+        self.notify_charged_check.toggled.connect(self.apply_settings)
+        
+        self.notify_warn_check = QtWidgets.QCheckBox("Notify")
+        self.notify_warn_check.setToolTip("Show notification when battery drops to warning threshold")
+        self.notify_warn_check.setChecked(getattr(self.app, "notify_warning", True))
+        self.notify_warn_check.toggled.connect(self.apply_settings)
+        
+        self.notify_crit_check = QtWidgets.QCheckBox("Notify")
+        self.notify_crit_check.setToolTip("Show notification when battery drops to critical threshold")
+        self.notify_crit_check.setChecked(getattr(self.app, "notify_critical", True))
+        self.notify_crit_check.toggled.connect(self.apply_settings)
+
         charged_layout = QtWidgets.QHBoxLayout()
         charged_layout.addWidget(self.charged_spin)
+        charged_layout.addWidget(self.notify_charged_check)
         
         self.tip_btn = QtWidgets.QToolButton()
         self.tip_btn.setIcon(QtGui.QIcon.fromTheme("help-about", QtGui.QIcon.fromTheme("dialog-information")))
@@ -246,9 +262,19 @@ class SettingsDialog(QtWidgets.QDialog):
         charged_layout.addWidget(self.tip_btn)
         charged_layout.addStretch()
 
+        warn_layout = QtWidgets.QHBoxLayout()
+        warn_layout.addWidget(self.warning_spin)
+        warn_layout.addWidget(self.notify_warn_check)
+        warn_layout.addStretch()
+
+        crit_layout = QtWidgets.QHBoxLayout()
+        crit_layout.addWidget(self.critical_spin)
+        crit_layout.addWidget(self.notify_crit_check)
+        crit_layout.addStretch()
+
         form.addRow("Full Charge Threshold:", charged_layout)
-        form.addRow("Warning (Orange) Threshold:", self.warning_spin)
-        form.addRow("Critical (Red) Threshold:", self.critical_spin)
+        form.addRow("Warning (Orange) Threshold:", warn_layout)
+        form.addRow("Critical (Red) Threshold:", crit_layout)
         form.addRow("Tray Icon Visual Zoom:", self.icon_scale_spin)
         form.addRow("Normal Level Color:", self.btn_color_normal)
         form.addRow("Warning Level Color:", self.btn_color_warning)
@@ -372,10 +398,16 @@ class SettingsDialog(QtWidgets.QDialog):
         
         show_txt = self.text_check.isChecked()
         autostart = self.autostart_check.isChecked()
+        notify_charged = self.notify_charged_check.isChecked()
+        notify_warn = self.notify_warn_check.isChecked()
+        notify_crit = self.notify_crit_check.isChecked()
         
         self.app.charged_threshold = charged_val
         self.app.warning_threshold = warn_val
         self.app.critical_threshold = crit_val
+        self.app.notify_charged = notify_charged
+        self.app.notify_warning = notify_warn
+        self.app.notify_critical = notify_crit
         self.app.icon_style = icon_sty
         self.app.colored_theme = theme_idx
         self.app.programmatic_style = prog_sty
@@ -394,6 +426,9 @@ class SettingsDialog(QtWidgets.QDialog):
         self.app.settings.setValue("charged_threshold", charged_val)
         self.app.settings.setValue("warning_threshold", warn_val)
         self.app.settings.setValue("critical_threshold", crit_val)
+        self.app.settings.setValue("notify_charged", notify_charged)
+        self.app.settings.setValue("notify_warning", notify_warn)
+        self.app.settings.setValue("notify_critical", notify_crit)
         self.app.settings.setValue("icon_style", icon_sty)
         self.app.settings.setValue("colored_theme", theme_idx)
         self.app.settings.setValue("programmatic_style", prog_sty)
@@ -460,6 +495,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.charged_threshold = self.settings.value("charged_threshold", 95, type=int)
         self.warning_threshold = self.settings.value("warning_threshold", 20, type=int)
         self.critical_threshold = self.settings.value("critical_threshold", 14, type=int)
+        self.notify_charged = self.settings.value("notify_charged", True, type=bool)
+        self.notify_warning = self.settings.value("notify_warning", True, type=bool)
+        self.notify_critical = self.settings.value("notify_critical", True, type=bool)
         self.icon_scale = self.settings.value("icon_scale", 100, type=int)
         
         # Status colors configuration
@@ -518,6 +556,11 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         self.cycle_start_percent = self.settings.value("cycle_start_percent", 100, type=int)
         self.last_poll_time = time.time()
         self.charge_start_percent = None
+        
+        # Notification alert latch states (prevent repeat notification spam)
+        self._alerted_critical = False
+        self._alerted_warning = False
+        self._alerted_charged = False
         
         # Initialize UI Components
         self.init_tray()
@@ -852,10 +895,69 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             
         self.tray_icon.setToolTip(f"{self.device_name}\nCharge: {self.battery_percentage}%{estimate}\n{charged_text}")
         
+        # Trigger desktop notifications if threshold crossed
+        self.check_notifications(percentage, is_charging)
+        
         # Save historical values
         self.last_percentage = percentage
         self.last_charging = is_charging
         self.has_valid_data = True
+
+    def check_notifications(self, percentage, is_charging):
+        dev_name = self.device_name or "Logitech Device"
+        MsgIcon = QtWidgets.QSystemTrayIcon.MessageIcon
+        
+        if is_charging:
+            # Clear low-battery latch flags when mouse is charging
+            self._alerted_critical = False
+            self._alerted_warning = False
+            
+            # Check full charge threshold notification
+            charged_thresh = getattr(self, "charged_threshold", 95)
+            if getattr(self, "notify_charged", True) and percentage >= charged_thresh:
+                if not self._alerted_charged:
+                    self._alerted_charged = True
+                    self.tray_icon.showMessage(
+                        f"{dev_name} Charged",
+                        f"Battery has reached {percentage}% (full charge threshold).",
+                        MsgIcon.Information,
+                        6000
+                    )
+            elif percentage < charged_thresh:
+                self._alerted_charged = False
+        else:
+            # Discharging state
+            self._alerted_charged = False
+            
+            crit_thresh = getattr(self, "critical_threshold", 14)
+            warn_thresh = getattr(self, "warning_threshold", 20)
+            
+            # Critical alert
+            if percentage <= crit_thresh:
+                if getattr(self, "notify_critical", True) and not self._alerted_critical:
+                    self._alerted_critical = True
+                    self._alerted_warning = True # Suppress warning if critical hits first
+                    self.tray_icon.showMessage(
+                        f"{dev_name} Battery Critical",
+                        f"Battery level is at {percentage}%. Please connect the charger.",
+                        MsgIcon.Critical,
+                        8000
+                    )
+            # Warning alert
+            elif percentage <= warn_thresh:
+                self._alerted_critical = False
+                if getattr(self, "notify_warning", True) and not self._alerted_warning:
+                    self._alerted_warning = True
+                    self.tray_icon.showMessage(
+                        f"{dev_name} Battery Low",
+                        f"Battery level has reached {percentage}%.",
+                        MsgIcon.Warning,
+                        6000
+                    )
+            else:
+                # Normal battery level: reset warning & critical latches
+                self._alerted_critical = False
+                self._alerted_warning = False
 
     def update_battery_history(self, percentage, is_charging):
         now = time.time()
