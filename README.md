@@ -28,9 +28,18 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
 
 ## Features
 
-- **Direct HID Probing**
-- **Hours-Remaining Estimator**
-- **Last Charge Timestamp Tracking**
+- **Direct HID Probing**: Low-level communication over `/dev/hidraw*` with Logitech receivers for fast, accurate battery reports without daemon overhead.
+- **Dynamic Condition Colored Progress Bar**: Visual battery level indicator in the context menu with condition colors:
+  - 🟩 **Charging**
+  - ⬜ **Normal Discharging**
+  - 🟧 **Warning Threshold** (guaranteed minimum 1-block display)
+  - 🟥 **Critical Threshold** (guaranteed minimum 1-block display)
+  - ⬛ **Empty Capacity Slots**
+- **Configurable Desktop Notifications**: Native desktop notifications when crossing **Critical**, **Warning**, and **Full Charge** thresholds, each with an independent enable/disable toggle.
+- **Smart Notification Latching**: Anti-spam latching alerts only once per threshold crossing and resets automatically when battery state changes.
+- **Configurable Full Charge Threshold**: User-adjustable threshold (80%–100%) to reset the runtime clock and discharge cycle estimator without waiting for 100% trickle charging.
+- **Hours-Remaining Estimator**: Adaptive drain-rate algorithm with suspend/shutdown interval filtering and moving average smoothing.
+- **Last Charge Timestamp Tracking**: Real-time counter of total runtime elapsed since the last full charge.
 - **6 Programmatic Vector Styles**:
   - **Solid Continuous**
   - **Segmented (3 Blocks)**
@@ -38,11 +47,11 @@ A lightweight, feature-rich system tray battery monitor for Logitech wireless mi
   - **Rounded Capsule**
   - **Rainbow Gradient**
   - **Circular Ring Gauge**
-- **60 Included Colored SVG Theme Icons**
-- **Vertical & Horizontal Layouts**
-- **Real-Time Live Previews**
-- **Native KDE Breeze Theme**
-- **Autostart Support**
+- **60 Included Colored SVG Theme Icons**: Full multi-level icon packs across 12 distinct color themes.
+- **Vertical & Horizontal Layouts**: Custom icon orientations tailored to top, bottom, or vertical panel docks.
+- **Real-Time Live Previews**: Changes in the Preferences dialog apply immediately to the tray icon and menu.
+- **Native KDE Breeze & Dark Theme Support**: Follows system palette with custom color pickers for every battery state.
+- **Autostart Support**: Easily toggle boot autostart directly from the context menu or Preferences.
 
 ---
 
@@ -135,13 +144,15 @@ Launch the application using any of the following methods:
 - **Direct Script**: Run `python3 logitech_battery.py` from the project directory.
 
 ### System Tray Right-Click Menu
-- **Logitech Device**: Device model name.
-- **Battery Status**: Current percentage, remaining hours estimate, and charging state.
-- **Runtime**: Elapsed time since the battery was last charged to the full charge threshold.
+- **Logitech Device**: Connected device model name.
+- **Battery Status & Progress Bar**: Live battery percentage, condition-colored progress bar, and status icon.
+- **Estimated Time Left**: Remaining hours estimate calculated from recent discharge rate.
+- **Charging State**: Visual indicator displayed when device is connected to a charger.
+- **Runtime Tracker**: Elapsed active time since reaching the full charge threshold (or time on charger).
 - **Refresh Now**: Force an immediate battery query.
-- **Refresh Interval**: Select polling interval (5s, 10s, 30s, 60s).
-- **Start on Boot**: Enable/disable autostart entry in `~/.config/autostart`.
-- **Preferences...**: Open the visual settings panel.
+- **Polling Interval**: Select background polling frequency (5s, 10s, 30s, 60s).
+- **Start on Boot**: Enable or disable user session autostart.
+- **Preferences...**: Configure thresholds, notifications, vector styles, colors, and visual scale.
 
 ---
 
