@@ -1075,69 +1075,60 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             return ""
 
         macro_rate = None
-        micro_rate = None
+        window_rate = None
         
-        # 1. Macro rate from cycle start (e.g. from 95% down to current percentage)
+        # 1. Macro rate from cycle start (e.g. from 92% down to current percentage)
         cycle_start = getattr(self, "cycle_start_percent", 100)
         cycle_active_sec = getattr(self, "cycle_active_seconds", 0.0)
         cycle_drop = cycle_start - current_percentage
         
-        # Require at least 5% drop AND at least 2 hours (7200s) of active tracking
+        # Require at least 5% drop AND at least 3 hours (10800s) of active tracking
         # to ensure short-term initial sag does not skew the macro drain rate.
-        if cycle_drop >= 5 and cycle_active_sec >= 7200:
+        if cycle_drop >= 5 and cycle_active_sec >= 10800:
             hours_cycle = cycle_active_sec / 3600.0
             rate = cycle_drop / hours_cycle
-            if 0.25 <= rate <= 5.0:
+            if 0.25 <= rate <= 2.5:
                 macro_rate = rate
 
-        # 2. Weighted micro rate across intervals in battery_history
+        # 2. Multi-hour window rate across battery_history
+        # Avoid calculating rates on single 1% steps (which are susceptible to 
+        # quantization noise and integer discretization). Instead, compute the
+        # rate across an accumulated window of >= 3% drop and >= 2.5 hours (9000s) of active use.
         if len(self.battery_history) >= 2:
-            interval_rates = []
-            interval_weights = []
+            newest = self.battery_history[-1]
+            a_curr = newest.get("active_seconds", 0.0)
+            p_curr = newest.get("percent", 0)
             
-            for i in range(1, len(self.battery_history)):
-                p_prev = self.battery_history[i - 1].get("percent", 0)
-                p_curr = self.battery_history[i].get("percent", 0)
+            for candidate in self.battery_history[:-1]:
+                a_prev = candidate.get("active_seconds", 0.0)
+                p_prev = candidate.get("percent", 0)
+                delta_p = p_prev - p_curr
+                delta_a = a_curr - a_prev
                 
-                a_prev = self.battery_history[i - 1].get("active_seconds", None)
-                a_curr = self.battery_history[i].get("active_seconds", None)
-                
-                if a_prev is not None and a_curr is not None:
-                    delta_sec = a_curr - a_prev
-                else:
-                    # Fallback for older entries without active_seconds
-                    delta_sec = self.battery_history[i].get("time", 0) - self.battery_history[i - 1].get("time", 0)
-                    if delta_sec > 300:
-                        delta_sec = 300
-                
-                delta_pct = p_prev - p_curr
-                # Require at least 180s active interval per 1% drop to filter out transient voltage sag
-                if delta_pct > 0 and delta_sec >= 180:
-                    r = delta_pct / (delta_sec / 3600.0)
-                    if 0.25 <= r <= 5.0:
-                        interval_rates.append(r)
-                        interval_weights.append(i)  # more recent intervals have higher weight
-                        
-            if interval_rates:
-                micro_rate = sum(r * w for r, w in zip(interval_rates, interval_weights)) / sum(interval_weights)
+                # Require >= 3% drop AND >= 9000 seconds (2.5h) of active tracking
+                if delta_p >= 3 and delta_a >= 9000:
+                    r = delta_p / (delta_a / 3600.0)
+                    if 0.25 <= r <= 2.5:
+                        window_rate = r
+                        break  # Found earliest valid baseline point in window
 
-        # 3. Blend rates or fall back to learned rate
-        if macro_rate is not None and micro_rate is not None:
-            effective_rate = 0.5 * macro_rate + 0.5 * micro_rate
-        elif micro_rate is not None:
-            effective_rate = micro_rate
+        # 3. Blend window rate, macro rate, or fall back to learned baseline
+        if macro_rate is not None and window_rate is not None:
+            effective_rate = 0.6 * macro_rate + 0.4 * window_rate
+        elif window_rate is not None:
+            effective_rate = window_rate
         elif macro_rate is not None:
             effective_rate = macro_rate
         else:
             effective_rate = getattr(self, "learned_drain_rate", 0.48)
 
-        # Clamp rate within practical hardware limits (0.25% to 5.0% / hour)
-        effective_rate = max(0.25, min(5.0, effective_rate))
+        # Clamp rate within practical wireless mouse hardware limits (0.25% to 2.5% / hr)
+        effective_rate = max(0.25, min(2.5, effective_rate))
 
-        # Only update learned drain rate if we had a genuine observation (macro or micro)
-        if macro_rate is not None or micro_rate is not None:
+        # Only update learned drain rate if we had a genuine multi-hour observation
+        if macro_rate is not None or window_rate is not None:
             current_learned = getattr(self, "learned_drain_rate", 0.48)
-            self.learned_drain_rate = 0.9 * current_learned + 0.1 * effective_rate
+            self.learned_drain_rate = 0.95 * current_learned + 0.05 * effective_rate
             self.settings.setValue("learned_drain_rate", self.learned_drain_rate)
 
         hours = current_percentage / effective_rate
