@@ -1030,8 +1030,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
             self.settings.setValue("cycle_start_percent", percentage)
             return
 
-        # If battery percentage increased by >= 3% while unplugged (e.g. battery swap or recalibration)
-        if percentage >= last_point.get("percent", 0) + 3:
+        # If battery percentage increased by >= 15% while unplugged (e.g. substantial charge or battery swap)
+        # Avoid resetting on small +1% to +5% open-circuit voltage rebound during PC off/idle
+        if percentage >= last_point.get("percent", 0) + 15:
             self.cycle_active_seconds = 0.0
             self.cycle_start_percent = percentage
             self.battery_history = [{"time": now, "active_seconds": 0.0, "percent": percentage}]
@@ -1081,7 +1082,9 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         cycle_active_sec = getattr(self, "cycle_active_seconds", 0.0)
         cycle_drop = cycle_start - current_percentage
         
-        if cycle_drop >= 2 and cycle_active_sec >= 900:  # at least 2% drop and 15 mins active
+        # Require at least 5% drop AND at least 2 hours (7200s) of active tracking
+        # to ensure short-term initial sag does not skew the macro drain rate.
+        if cycle_drop >= 5 and cycle_active_sec >= 7200:
             hours_cycle = cycle_active_sec / 3600.0
             rate = cycle_drop / hours_cycle
             if 0.25 <= rate <= 5.0:
@@ -1108,7 +1111,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                         delta_sec = 300
                 
                 delta_pct = p_prev - p_curr
-                if delta_pct > 0 and delta_sec >= 60:
+                # Require at least 180s active interval per 1% drop to filter out transient voltage sag
+                if delta_pct > 0 and delta_sec >= 180:
                     r = delta_pct / (delta_sec / 3600.0)
                     if 0.25 <= r <= 5.0:
                         interval_rates.append(r)
@@ -1125,15 +1129,16 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         elif macro_rate is not None:
             effective_rate = macro_rate
         else:
-            effective_rate = getattr(self, "learned_drain_rate", 0.83)
+            effective_rate = getattr(self, "learned_drain_rate", 0.48)
 
         # Clamp rate within practical hardware limits (0.25% to 5.0% / hour)
         effective_rate = max(0.25, min(5.0, effective_rate))
 
-        # Update learned drain rate with light exponential smoothing (10% new rate, 90% prior)
-        current_learned = getattr(self, "learned_drain_rate", 0.83)
-        self.learned_drain_rate = 0.9 * current_learned + 0.1 * effective_rate
-        self.settings.setValue("learned_drain_rate", self.learned_drain_rate)
+        # Only update learned drain rate if we had a genuine observation (macro or micro)
+        if macro_rate is not None or micro_rate is not None:
+            current_learned = getattr(self, "learned_drain_rate", 0.48)
+            self.learned_drain_rate = 0.9 * current_learned + 0.1 * effective_rate
+            self.settings.setValue("learned_drain_rate", self.learned_drain_rate)
 
         hours = current_percentage / effective_rate
         time_str = self.format_duration(hours * 3600)
