@@ -1004,10 +1004,23 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
                 self.settings.setValue("cycle_start_percent", percentage)
             self.charge_start_percent = None
 
-        # Accumulate active discharge time (filtering out sleep/suspend gaps > 5 mins)
+        # Accumulate active discharge time
         if 0 < poll_gap <= max_normal_gap:
             self.cycle_active_seconds += poll_gap
             self.settings.setValue("cycle_active_seconds", self.cycle_active_seconds)
+        elif poll_gap > max_normal_gap and self.battery_history:
+            # Handle period where app was closed, system was suspended, or mouse was offline.
+            # If the battery dropped during this gap, credit equivalent active discharge time
+            # so the drop isn't counted against zero active seconds (which causes rate spikes).
+            last_recorded_pct = self.battery_history[-1].get("percent", percentage)
+            gap_drop = last_recorded_pct - percentage
+            if gap_drop > 0:
+                learned_rate = getattr(self, "learned_drain_rate", 0.50)
+                # Estimate active usage that caused this drop, capped at actual wall-clock elapsed time
+                equiv_active_sec = (gap_drop / max(0.25, learned_rate)) * 3600.0
+                credited_sec = min(float(poll_gap), equiv_active_sec)
+                self.cycle_active_seconds += credited_sec
+                self.settings.setValue("cycle_active_seconds", self.cycle_active_seconds)
 
         # If history is empty, initialize it
         if not self.battery_history:
@@ -1077,44 +1090,48 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         macro_rate = None
         window_rate = None
         
-        # 1. Macro rate from cycle start (e.g. from 92% down to current percentage)
+        # 1. Macro rate from cycle start (e.g. from 95% down to current percentage)
         cycle_start = getattr(self, "cycle_start_percent", 100)
         cycle_active_sec = getattr(self, "cycle_active_seconds", 0.0)
         cycle_drop = cycle_start - current_percentage
         
         # Require at least 5% drop AND at least 3 hours (10800s) of active tracking
-        # to ensure short-term initial sag does not skew the macro drain rate.
         if cycle_drop >= 5 and cycle_active_sec >= 10800:
             hours_cycle = cycle_active_sec / 3600.0
             rate = cycle_drop / hours_cycle
-            if 0.25 <= rate <= 2.5:
+            # Realistic mouse active drain rate (0.25% to 1.5% / hr)
+            if 0.25 <= rate <= 1.5:
                 macro_rate = rate
 
         # 2. Multi-hour window rate across battery_history
-        # Avoid calculating rates on single 1% steps (which are susceptible to 
-        # quantization noise and integer discretization). Instead, compute the
-        # rate across an accumulated window of >= 3% drop and >= 2.5 hours (9000s) of active use.
+        # Avoid calculating rates on single 1% steps. Instead, evaluate candidate
+        # baselines in history spanning >= 3% drop and >= 2.5 hours (9000s) of active tracking.
         if len(self.battery_history) >= 2:
             newest = self.battery_history[-1]
             a_curr = newest.get("active_seconds", 0.0)
             p_curr = newest.get("percent", 0)
             
+            valid_rates = []
             for candidate in self.battery_history[:-1]:
                 a_prev = candidate.get("active_seconds", 0.0)
                 p_prev = candidate.get("percent", 0)
                 delta_p = p_prev - p_curr
                 delta_a = a_curr - a_prev
                 
-                # Require >= 3% drop AND >= 9000 seconds (2.5h) of active tracking
-                if delta_p >= 3 and delta_a >= 9000:
+                # Require >= 3% drop, >= 9000s active tracking, and plausible discharge pacing
+                if delta_p >= 3 and delta_a >= 9000 and (delta_a / delta_p) >= 1200:
                     r = delta_p / (delta_a / 3600.0)
-                    if 0.25 <= r <= 2.5:
-                        window_rate = r
-                        break  # Found earliest valid baseline point in window
+                    if 0.25 <= r <= 1.5:
+                        valid_rates.append(r)
+            
+            if valid_rates:
+                # Use median candidate rate to resist transient sag or burst usage
+                valid_rates.sort()
+                window_rate = valid_rates[len(valid_rates) // 2]
 
         # 3. Blend window rate, macro rate, or fall back to learned baseline
         if macro_rate is not None and window_rate is not None:
-            effective_rate = 0.6 * macro_rate + 0.4 * window_rate
+            effective_rate = 0.5 * macro_rate + 0.5 * window_rate
         elif window_rate is not None:
             effective_rate = window_rate
         elif macro_rate is not None:
@@ -1122,8 +1139,8 @@ class LogitechBatteryTrayApp(QtWidgets.QApplication):
         else:
             effective_rate = getattr(self, "learned_drain_rate", 0.48)
 
-        # Clamp rate within practical wireless mouse hardware limits (0.25% to 2.5% / hr)
-        effective_rate = max(0.25, min(2.5, effective_rate))
+        # Clamp rate within practical wireless mouse hardware limits (0.25% to 1.5% / hr)
+        effective_rate = max(0.25, min(1.5, effective_rate))
 
         # Only update learned drain rate if we had a genuine multi-hour observation
         if macro_rate is not None or window_rate is not None:
