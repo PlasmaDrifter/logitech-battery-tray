@@ -118,6 +118,24 @@ sudo udevadm trigger
 
 ---
 
+## Updating
+
+To update an existing installation to the latest version:
+
+```bash
+cd logitech-battery-tray
+git pull
+./install.sh
+```
+
+If the tray monitor is currently running, relaunch it to apply updates:
+```bash
+killall -q logitech-battery-tray || true
+logitech-battery-tray &
+```
+
+---
+
 ## Uninstallation
 
 To remove the application, CLI launcher, desktop entries, and icons:
